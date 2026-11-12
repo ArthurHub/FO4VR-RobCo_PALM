@@ -47,7 +47,7 @@ extern "C" __declspec(dllexport) palm::api::Result PALM_CALL PALMAPI_QueryInterf
 }
 
 // Retired pre-2.0 exports. They stay exported so a mod still built against them
-// is named in the required-update stop instead of failing on a missing symbol;
+// is named in RobCoPALM.log instead of failing on a missing symbol;
 // each returns no table. Their names are never reused.
 extern "C" __declspec(dllexport) const void* PALM_CALL GetPALMMenuApi(std::uint32_t) noexcept {
  wheel::required_updates::noteRetiredExport("GetPALMMenuApi",_ReturnAddress());

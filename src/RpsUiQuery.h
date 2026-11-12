@@ -5,7 +5,7 @@
 
 namespace wheel {
 // Null when RPS UI Framework is not loaded, or when the loaded one has no 2.0
-// discovery, which also stops the game at the main menu.
+// discovery, which is logged once.
 inline rpsui::api::QueryInterfaceV1 rpsUiQuery() noexcept {
     const auto module=GetModuleHandleW(rpsui::api::kModuleName);
     if(!module)return nullptr;

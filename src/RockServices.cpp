@@ -1,22 +1,19 @@
 #include "PCH.h"
 #include "RockServices.h"
 #include "tools/LoadedRpsMods.h"
-#include <RPS/Runtime/RequiredUpdate.h>
 namespace wheel {
 namespace {
-// A loaded ROCK that does not serve the API PALM was built for stops the game
-// at the main menu (RPS/Runtime/RequiredUpdate.h); a missing ROCK does not.
-// PALM requests the exact versions its ROCK headers declare, so every version
-// refusal is a real mismatch.
+// A loaded ROCK that does not serve the API PALM was built for is logged and
+// leaves PALM's ROCK integration off, as a missing ROCK does. PALM requests the
+// exact versions its ROCK headers declare, so every version refusal is a real
+// mismatch.
 bool isVersionRefusal(rock::api::Status status) {
     using rock::api::Status;
     return status==Status::UnknownInterface || status==Status::UnsupportedMajor || status==Status::UnsupportedMinor ||
         status==Status::TableTooSmall || status==Status::InvalidSize;
 }
 void reportRockMismatch(const char* reason) {
-    spdlog::critical("PALM does not work with the loaded ROCK ({}): the game stops at the main menu until they match",reason);
-    RPS::Runtime::RequiredUpdate::report(L"RobCo PALM does not work with the installed ROCK: they were built for "
-        L"different ROCK versions. Install matching versions of ROCK and RobCo PALM.");
+    spdlog::error("PALM does not work with the loaded ROCK ({}): they were built for different ROCK versions; PALM's ROCK integration stays off until they match",reason);
 }
 }
 RockServices& rockServices() { static auto* service=new RockServices(); return *service; }

@@ -15,7 +15,7 @@ endif()
 # ROCK publishes its provider API from its own include/ directory.
 set(ROCK_INCLUDE_DIR "${WORKSPACE}/main_projects/ROCK/include" CACHE PATH "ROCK public include directory")
 # RPS Framework's staged package: PALM.toml (RPS::Settings) and the
-# header-only required-update stop (RPS/Runtime/RequiredUpdate.h).
+# header-only caller naming for refusal logs (RPS/Runtime/CallerModule.h).
 set(RPSFramework_DIR "${WORKSPACE}/my_frameworks_and_sdks/RPS_Framework/build-fast/stage/lib/cmake/RPSFramework" CACHE PATH "RPS Framework staged package")
 set(COMMON_LIB_F4VR_PATH "${WORKSPACE}/libraries_and_tools/CommonLibF4VR" CACHE PATH "")
 set(ENABLE_FALLOUT_VR ON CACHE BOOL "" FORCE)

@@ -1,9 +1,8 @@
 #pragma once
 
-// Version mismatches stop the game at the main menu with an error box naming the
-// mod to update (RPS/Runtime/RequiredUpdate.h; Plugin.cpp registers the watch):
-// a consumer built for another PALM API, and a loaded RPS UI Framework without
-// the discovery PALM was built for.
+// Version mismatches are logged once, naming the mod to update, and never stop
+// the game: a consumer built for another PALM API, and a loaded RPS UI
+// Framework without the discovery PALM was built for.
 
 #include <RobCoPALM/Abi.h>
 

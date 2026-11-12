@@ -5,8 +5,8 @@ PALM 1.2 published one interface, the wheel section API, in
 `GetPALMMenuApi` export of `wheelmenu.dll`. PALM 2.0 publishes the Menu and
 Developer interfaces at major 2 from this repository's `include/RobCoPALM/`,
 found through `PALMAPI_QueryInterfaceV1`. `GetPALMMenuApi` stays exported only
-to refuse: it returns no table, and PALM stops the game at the main menu with
-an error box naming the mod that called it. A mod with a wheel section has to
+to refuse: it returns no table, and PALM names the mod that called it in
+`RobCoPALM.log`. A mod with a wheel section has to
 be rebuilt with the changes on this page. The section's behaviour is
 unchanged.
 
@@ -45,7 +45,7 @@ if (palm::api::acquire(query, menu) != palm::api::Result::Ok) {
 ```
 
 `acquire` requests exactly the major, minor and table size your headers
-declare. Never probe with trial queries: every refused query stops the game.
+declare. Never probe with trial queries: every refused query is logged as a mismatch.
 
 ## 3. Names and records
 
@@ -77,5 +77,5 @@ Developer wheel, shown only while PALM's Developer mode is on.
 1. Build against `include/RobCoPALM/` with no 1.2 header left.
 2. Search your source for leftovers: `PALMMenuApi.h`, `PALMIcons.h`,
    `GetPALMMenuApi`, `kExportName`, `SectionV1`, `ItemV1`, `structSize`.
-3. Start the game with PALM 2.0. No error box appears at the main menu, and
-   your section appears in PALM's settings, where the player enables it.
+3. Start the game with PALM 2.0. `RobCoPALM.log` names no refusal for your
+   DLL, and your section appears in PALM's settings, where the player enables it.

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A version mismatch no longer closes the game. A mod built for another PALM version,
+  a ROCK that does not serve the API PALM was built for, or an RPS UI Framework older
+  than PALM supports is named in `RobCoPALM.log`, and the game keeps running without
+  the mismatched features. No error box appears at the main menu.
+
 ## 2.0.0
 
 ### Requirements

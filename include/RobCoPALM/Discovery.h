@@ -4,7 +4,7 @@
 // Resolve kQueryExportName from the loaded kModuleName and ask for an interface
 // by ID, exact major, minimum minor and minimum table size. A major this PALM
 // does not serve returns UnsupportedMajor and no table; PALM logs the refusal
-// and names the calling DLL in an error box at the main menu.
+// with the calling DLL.
 // The pre-2.0 exports (GetPALMMenuApi and GetPALMDeveloperApi) only refuse
 // outdated consumers; their names are never reused.
 #pragma pack(push, 8)
