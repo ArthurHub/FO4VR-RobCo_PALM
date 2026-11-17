@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 4.2)
 set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "")
-project(RobCoPALM VERSION 2.0.0 LANGUAGES CXX RC)
+project(RobCoPALM VERSION 2.0.1 LANGUAGES CXX RC)
 get_filename_component(WORKSPACE "${CMAKE_CURRENT_SOURCE_DIR}/../../PROJECT_ROCK_V2" ABSOLUTE)
 # PALM's own provider API: self-contained headers PALM compiles against.
 set(PALM_PUBLIC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
