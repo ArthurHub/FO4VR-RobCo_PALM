@@ -1,7 +1,7 @@
 #pragma once
 #include <RPS_UI_Framework/Framework.h>
 
-// RPS UI Framework owns the settings menu (every mod's pages, the Spawner, the Console).
+// RPS UI Framework owns the settings menu (the Spawner, the Console and the pages mods add).
 // PALM opens it from the wheel's Config entry and adds its own two pages, the wheel's
 // items and its settings, which it draws with its own ImGui copy inside the menu.
 namespace wheel {

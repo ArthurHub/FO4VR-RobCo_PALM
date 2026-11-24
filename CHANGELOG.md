@@ -12,6 +12,8 @@
 - Choosing a grenade on the wheel asks ROCK for it. With ROCK's Immersive Grenades
   on it comes to your hand; with it off PALM equips it, as before. PALM no longer
   reads ROCK's settings to decide.
+- **Config** opens on PALM's Wheel items and Wheel settings, with the Spawner and the
+  Console. The other RPS mods' settings moved to each mod's page in Mods Config FO4 VR.
 
 ## 2.0.1
 
