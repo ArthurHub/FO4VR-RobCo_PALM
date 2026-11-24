@@ -20,6 +20,9 @@ State& state(){static State value;return value;}
 constexpr std::array pitchKeys{"LeftPitchDegrees","RightPitchDegrees"};
 constexpr std::array yawKeys{"LeftYawDegrees","RightYawDegrees"};
 constexpr std::string_view kDefaultMode="press";
+// PALM.ini's sOpenMenu, which only OpenMenu's conversion reads, and the default PALM.ini wrote for it.
+constexpr std::string_view kLegacyOpenMenuKey="LegacyOpenMenu";
+constexpr std::string_view kLegacyOpenMenuDefault="right release thumbstick suppress";
 bool readAngle(const settings::Store& store,const char* key,float& value) {
  const auto& text=store.find("Pointer",key)->value;float parsed{};
  const auto result=std::from_chars(text.data(),text.data()+text.size(),parsed);
@@ -33,8 +36,9 @@ std::vector<settings::Definition> palmDefinitions() {
   {"Controls","InputMode","01. Controls","How PALM opens: 1 = click the right thumbstick (or ROCK's Palm binding when ROCK's setup wizard moves it), 2 = hold grip and trigger, 3 = Custom (Mode and OpenMenu).\n"
    "Change it in game under Config > PALM > Controls.",player,settings::ValueType::Integer,"1"},
   {"Controls","Mode","01. Controls","Custom only: press (click to select) or hold (release to select).",player,settings::ValueType::String,std::string(kDefaultMode)},
-  {"Controls","OpenMenu","01. Controls","Custom only: the button that opens PALM, as hand, activation and button, for example 'right release thumbstick suppress'.\n"
-   "Set it in game under Config > PALM > Controls.",player,settings::ValueType::String,bindingText(Controls{})},
+  {"Controls","OpenMenu","01. Controls","Custom only: the button that opens PALM, as a table of hand, type and button, for example\n"
+   "{ hand = \"right\", type = \"release\", button = \"thumbstick\" }, with an optional duration and modifier = { button = \"grip\" }.\n"
+   "Set it in game under Config > PALM > Controls.",player,settings::ValueType::Table,bindingText(Controls{})},
  };
  for(unsigned hand=0;hand<2;++hand) {
   const auto side=hand?"right":"left";
@@ -56,39 +60,63 @@ std::span<const settings::LegacyKey> palmLegacyKeys() {
    legacy.oldDefault=result.texts.emplace_back(found->defaultValue);
    result.keys.push_back(legacy);
   };
-  row("iInputMode","Controls","InputMode");row("sMode","Controls","Mode");row("sOpenMenu","Controls","OpenMenu");
+  row("iInputMode","Controls","InputMode");row("sMode","Controls","Mode");
   row("fLeftPitchDegrees","Pointer","LeftPitchDegrees");row("fRightPitchDegrees","Pointer","RightPitchDegrees");
   row("fLeftYawDegrees","Pointer","LeftYawDegrees");row("fRightYawDegrees","Pointer","RightYawDegrees");
   row("bEnabled","Developer","Enabled");
+  settings::LegacyKey openMenu{};openMenu.oldKey="sOpenMenu";openMenu.table="Controls";openMenu.key=kLegacyOpenMenuKey;
+  openMenu.kind=settings::LegacyKind::ConversionInput;openMenu.oldDefault=kLegacyOpenMenuDefault;openMenu.oldSection="Controls";
+  result.keys.push_back(openMenu);
   return result;
  }();
  return table.keys;
 }
+/**
+ * OpenMenu's table from the one-line binding PALM wrote before it kept a table: from PALM.toml's old string, or from
+ * PALM.ini's sOpenMenu. Nothing once the file holds the table. A line the parser cannot read becomes the default.
+ */
+std::optional<std::string> convertOpenMenu(const settings::ConversionSource& source) {
+ auto line=source.value("Controls","OpenMenu",settings::ValueType::String);
+ if(!line)line=source.value("Controls",kLegacyOpenMenuKey,settings::ValueType::String);
+ if(!line)return std::nullopt;
+ Controls controls;
+ if(const auto parsed=f4cf::vrcf::parseInputBinding(*line))controls.binding=*parsed;
+ return bindingText(controls);
+}
+constexpr std::array kConversions{settings::ValueConversion{"Controls","OpenMenu",&convertOpenMenu}};
 // An INI without iInputMode kept its binding: the matching preset, else Custom.
 InputMode inferredMode(const Controls& controls) {
  return controls==Controls{}?InputMode::StickClick:controls==controlsForMode(InputMode::GripTriggerHold)?InputMode::GripTriggerHold:InputMode::Custom;
 }
 constexpr std::array activationTypes{f4cf::vrcf::ActivationType::Press,f4cf::vrcf::ActivationType::Tap,f4cf::vrcf::ActivationType::DoublePress,f4cf::vrcf::ActivationType::HoldDown,f4cf::vrcf::ActivationType::LongPress,f4cf::vrcf::ActivationType::Release};
-constexpr std::array activationNames{"press","tap","double","hold","longpress","release"};
-constexpr std::array hands{"primary","offhand","right","left"};
 constexpr std::array buttons{vr::k_EButton_SteamVR_Trigger,vr::k_EButton_Grip,vr::k_EButton_A,vr::k_EButton_ApplicationMenu,vr::k_EButton_SteamVR_Touchpad};
-constexpr std::array buttonNames{"trigger","grip","a","b","thumbstick"};
-const char* buttonName(vr::EVRButtonId button){for(unsigned i=0;i<buttons.size();++i)if(buttons[i]==button)return buttonNames[i];return "invalid";}
 bool supported(vr::EVRButtonId button){return std::find(buttons.begin(),buttons.end(),button)!=buttons.end();}
+/**
+ * The binding of an inline table's TOML text, read as CommonFramework reads its config, or why it is none.
+ */
+std::expected<f4cf::vrcf::InputBinding,std::string> parseBindingTable(std::string_view text) {
+ try {
+  const auto document=toml::parse(std::format("binding = {}",text));
+  if(const auto* node=document.get("binding");node && document.size()==1)return f4cf::vrcf::parseInputBindingTable(*node);
+ }catch(const toml::parse_error&){}
+ return std::unexpected(std::string(R"(OpenMenu is not a table, as { hand = "right", type = "release", button = "thumbstick" })"));
 }
+}
+/**
+ * The binding as OpenMenu's table, as CommonFramework writes it. PALM always suppresses its binding, so the table
+ * leaves suppress out.
+ */
 std::string bindingText(const Controls& controls) {
- const auto& b=controls.binding;
- auto text=std::format("{} {} {}",hands[static_cast<unsigned>(b.hand)],activationNames[static_cast<unsigned>(std::find(activationTypes.begin(),activationTypes.end(),b.type)-activationTypes.begin())],buttonName(b.button));
- if(b.duration>0)text+=std::format(" {:.2f}",b.duration);
- text+=" suppress";
- if(b.modifier){text+=" +";if(b.modifier->hand)text+=std::string(hands[static_cast<unsigned>(*b.modifier->hand)])+":";text+=buttonName(b.modifier->button);}
- return text;
+ auto binding=controls.binding;binding.suppress=false;
+ return f4cf::vrcf::inputBindingTomlText(binding);
 }
 bool parseControls(std::string_view mode,std::string_view text,Controls& out,std::string& error) {
  using namespace f4cf::vrcf;
  if(mode!="hold" && mode!="press"){error="Mode must be hold or press";return false;}
- const auto parsed=parseInputBinding(text);
- if(!parsed || !parsed->isEnabled() || !supported(parsed->button) || (parsed->modifier && !supported(parsed->modifier->button))){error="Choose a button, optionally with one modifier";return false;}
+ const auto parsed=parseBindingTable(text);
+ if(!parsed){error=parsed.error();return false;}
+ if(!parsed->isEnabled() || !supported(parsed->button) || (parsed->modifier && !supported(parsed->modifier->button))){error="Choose a button, optionally with one modifier";return false;}
+ if(parsed->hand==Hand::Any || (parsed->modifier && parsed->modifier->hand==Hand::Any)){error="Choose one hand: primary, offhand, right or left";return false;}
  if(std::find(activationTypes.begin(),activationTypes.end(),parsed->type)==activationTypes.end()) {
   error="Choose press, tap, double tap, hold, long press, or release. Touch and axes are not supported.";return false;
  }
@@ -123,7 +151,7 @@ std::unique_ptr<settings::Store> openPalmSettings(const std::filesystem::path& p
    "## Change these in game under Config > PALM, or edit this file while the game is closed.\n"
    "## Each option has its help above it. When PALM starts it adds new options with their defaults and rewrites its\n"
    "## help lines (##). Your own notes are kept when they start with a single # on the lines above an option.\n",{}},
-  palmDefinitions(),settings::LegacyIni{{ini},palmLegacyKeys()});
+  palmDefinitions(),settings::LegacyIni{{ini},palmLegacyKeys()},std::span<const settings::RenamedKey>{},std::span<const settings::ValueConversion>(kConversions));
  store->load(true);
  if(inferMode) {
   Controls controls;std::string error;

@@ -300,7 +300,7 @@ F4VR-CommonFramework input bindings
 ========================================================================
 
 Upstream: https://github.com/ArthurHub/F4VR-CommonFramework
-Pinned source: e672668f46925024047c8a9763e31008a165309f
+Pinned source: 14a76b9484b777c7e60c90880827a54392da80c2
 Authors: ArthurHub and contributors; GNU GPL version 3.
 external/F4VR-Input contains the upstream binding parser and extracted value
 types. Include paths are adapted to this build. ORIGIN.txt records provenance;

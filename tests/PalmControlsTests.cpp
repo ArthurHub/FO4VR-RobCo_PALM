@@ -2,6 +2,8 @@
 #include "RockInputPolicy.h"
 #include <iostream>
 #include <fstream>
+#include <iterator>
+#include <string>
 #include <stdexcept>
 #include <Windows.h>
 #include <limits>
@@ -217,7 +219,7 @@ int main(){try {
  gesture={};plainClick(0,0,0,{true,false});plainClick(0,stick,1,{true,false});
  check(plainClick(0,0,1.01,{true,false})==ControlEdge::Open,"unbound hand's holster blocked right click");
  std::string legacyError;
- check(parseControls("hold","right hold trigger 0.25 suppress +grip",controls,legacyError),"explicit hold binding rejected");
+ check(parseControls("hold",R"({ hand = "right", type = "hold", button = "trigger", duration = 0.25, modifier = { button = "grip" } })",controls,legacyError),"explicit hold binding rejected");
  gesture={};
  const auto update=[&](bool all,bool any,double time,bool click=false,bool usable=true){return gesture.update(usable,controls,all,any,click,time);};
  check(update(true,true,0)==ControlEdge::None,"a held binding opened across a context change");
@@ -238,16 +240,23 @@ int main(){try {
  update(false,false,7);update(true,true,8);update(true,true,8.1,false,false);
  check(!gesture.ownsInput(),"context loss retained capture");
  std::string error;Controls parsed;
- check(parseControls("press","offhand press a +primary:grip",parsed,error),"framework chord syntax rejected");
+ check(parseControls("press",R"({ hand = "offhand", type = "press", button = "a", modifier = { hand = "primary", button = "grip" } })",parsed,error),"framework chord table rejected");
  auto masks=controlMasks(parsed,false);check(masks.buttons[0]==(1ull<<7) && masks.buttons[1]==(1ull<<2),"cross-hand binding mapped incorrectly");
  masks=controlMasks(parsed,true);check(masks.buttons[1]==(1ull<<7) && masks.buttons[0]==(1ull<<2),"left-handed mode did not swap logical hands");
- check(parseControls("hold","right press trigger",parsed,error) && parsed.mode==OpenMode::Hold,"opening gesture was coupled to selection mode");
- check(!parseControls("hold","right hold trigger nan",parsed,error),"nonfinite hold accepted");
- check(!parseControls("hold","right hold trigger +trigger",parsed,error),"duplicate chord members accepted");
- check(!parseControls("press","none",parsed,error),"inaccessible opening binding accepted");
- check(!parseControls("press","right touch trigger",parsed,error),"touch binding accepted");
- check(!parseControls("press","right thumbstick up",parsed,error),"axis binding accepted");
- for(const auto text:{"left press grip","right tap a +grip","left double b 0.4 +right:trigger","primary hold trigger 0.25 +grip","offhand longpress a 0.6","left release grip"}) {
+ check(parseControls("hold",R"({ hand = "right", type = "press", button = "trigger" })",parsed,error) && parsed.mode==OpenMode::Hold,"opening gesture was coupled to selection mode");
+ check(!parseControls("hold",R"({ hand = "right", type = "hold", button = "trigger", duration = nan })",parsed,error),"nonfinite hold accepted");
+ check(!parseControls("hold",R"({ hand = "right", type = "hold", button = "trigger", modifier = { button = "trigger" } })",parsed,error),"duplicate chord members accepted");
+ check(!parseControls("press",R"({ type = "none" })",parsed,error),"inaccessible opening binding accepted");
+ check(!parseControls("press",R"({ hand = "right", type = "touch", button = "trigger" })",parsed,error),"touch binding accepted");
+ check(!parseControls("press",R"({ hand = "right", type = "axis", axis = "thumbstick", direction = "up" })",parsed,error),"axis binding accepted");
+ check(!parseControls("press",R"({ hand = "any", type = "press", button = "grip" })",parsed,error),"a binding of either hand accepted");
+ check(!parseControls("press",R"({ hand = "right", type = "press", button = "grip", modifier = { hand = "any", button = "a" } })",parsed,error),"a modifier of either hand accepted");
+ check(!parseControls("press","right press grip",parsed,error),"the old one-line binding read as a table");
+ check(!parseControls("press","{ hand = \"right\", type = \"press\", button = \"grip\" }\nother = 1",parsed,error),"text past the table accepted");
+ for(const auto text:{R"({ hand = "left", type = "press", button = "grip" })",R"({ hand = "right", type = "tap", button = "a", modifier = { button = "grip" } })",
+  R"({ hand = "left", type = "double", button = "b", duration = 0.4, modifier = { hand = "right", button = "trigger" } })",
+  R"({ hand = "primary", type = "hold", button = "trigger", duration = 0.25, modifier = { button = "grip" } })",
+  R"({ hand = "offhand", type = "longpress", button = "a", duration = 0.6 })",R"({ hand = "left", type = "release", button = "grip" })"}) {
   check(parseControls("hold",text,parsed,error),"button binding type rejected");
   Controls roundtrip;check(parseControls(parsed.mode==OpenMode::Hold?"hold":"press",bindingText(parsed),roundtrip,error) && roundtrip==parsed,"binding type did not roundtrip");
  }
@@ -270,7 +279,8 @@ int main(){try {
  check(update(false,false,4)==ControlEdge::Open,"release binding failed after a long hold");
  controls.binding.duration=.2f;gesture={};update(false,false,0);update(true,true,1);
  check(update(false,false,1.3)==ControlEdge::None,"release binding ignored its maximum hold");
- check(parseControls("hold","left tap b +grip",parsed,error) && parsed.mode==OpenMode::Press,"tap offered impossible release-to-select");
+ check(parseControls("hold",R"({ hand = "left", type = "tap", button = "b", modifier = { button = "grip" } })",parsed,error) && parsed.mode==OpenMode::Press,"tap offered impossible release-to-select");
+ check(bindingText(Controls{})==R"({ hand = "right", type = "release", button = "thumbstick" })","default binding is not the table a person writes");
  check(parseControls("press",bindingText(Controls{}),parsed,error) && parsed==Controls{},"default binding did not roundtrip");
  // Fixtures stay with the test build, never in the system temporary directory.
  const std::filesystem::path directory(PALM_CONTROLS_TEST_DIR);
@@ -278,11 +288,13 @@ int main(){try {
  struct Cleanup{std::filesystem::path path;~Cleanup(){initializeControls({});std::error_code error;std::filesystem::remove_all(path,error);}} cleanup{directory};
  const auto path=directory/"PALM.toml",ini=directory/"PALM.ini";
  const auto write=[](const std::filesystem::path& file,const char* text){std::ofstream(file,std::ios::binary)<<text;};
+ const auto read=[](const std::filesystem::path& file){std::ifstream in(file,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};
  // An INI from before input modes keeps its remapped binding as Custom, and goes.
  write(ini,"[Other]\nuntouched=hello\n[Controls]\nsMode=press\nsOpenMenu=left press b +grip\n");
  initializeControls(path);const auto loaded=snapshotControls();check(loaded.mode==OpenMode::Press && loaded.binding.hand==Hand::Left,"PALM did not migrate its INI");
  check(!std::filesystem::exists(ini) && std::filesystem::exists(path),"PALM.ini was not replaced by PALM.toml");
  check(snapshotInputMode()==InputMode::Custom,"legacy remapping was not retained as Custom");
+ check(read(path).find(R"(OpenMenu = { hand = "left", type = "press", button = "menu", modifier = { button = "grip" } })")!=std::string::npos,"PALM.ini's binding did not become a table");
  for(const auto mode:{InputMode::StickClick,InputMode::GripTriggerHold}) {
   check(applyInputMode(mode) && snapshotControls()==controlsForMode(mode),"fixed input mode used custom binding");
   check(!applyControls(loaded),"preset permitted remapping outside Custom");
@@ -314,6 +326,13 @@ int main(){try {
  check(snapshotInputMode()==InputMode::StickClick && snapshotControls()==Controls{} && snapshotPointerAim()==PointerAim{} && std::filesystem::exists(path),"first run did not create mode 1 and pointer defaults");
  write(path,"[Controls]\nInputMode = 99\n");initializeControls(path);
  check(snapshotInputMode()==InputMode::StickClick && snapshotControls()==Controls{},"invalid saved mode did not use default");
+ // PALM.toml's old one-line binding becomes its table once.
+ write(path,"[Controls]\nInputMode = 3\nOpenMenu = \"left press grip +trigger\"\n");initializeControls(path);
+ check(snapshotControls().binding.hand==Hand::Left && snapshotControls().binding.modifier && snapshotControls().binding.modifier->button==vr::k_EButton_SteamVR_Trigger,"the old OpenMenu line was not converted");
+ check(read(path).find(R"(OpenMenu = { hand = "left", type = "press", button = "grip", modifier = { button = "trigger" } })")!=std::string::npos,"PALM.toml's old binding did not become a table");
+ initializeControls(path);check(snapshotControls().binding.hand==Hand::Left,"the converted binding did not read back");
+ write(path,"[Controls]\nInputMode = 3\nOpenMenu = \"sideways\"\n");initializeControls(path);
+ check(snapshotControls()==Controls{},"an unreadable old OpenMenu line did not become the default");
  // An INI with a chosen preset keeps it.
  std::filesystem::remove(path);write(ini,"[Controls]\niInputMode=2\nsMode=press\nsOpenMenu=right release thumbstick suppress\n");
  initializeControls(path);check(snapshotInputMode()==InputMode::GripTriggerHold,"a migrated preset was not kept");

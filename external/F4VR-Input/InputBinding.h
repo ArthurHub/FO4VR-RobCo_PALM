@@ -1,7 +1,7 @@
 #pragma once
 
-#include <optional>
 #include <cstdint>
+#include <optional>
 
 #include <openvr.h>
 
@@ -53,16 +53,24 @@ namespace f4cf::vrcf
         Vive
     };
 
+    /**
+     * A controller by the player's handedness (Primary, Offhand) or by its side (Right, Left). Any is either
+     * controller, for a binding alone: VRControllersManager::check resolves it to each hand, and every other
+     * call that takes a hand needs one controller.
+     */
     enum class Hand : std::uint8_t
     {
         Primary,
         Offhand,
         Right,
         Left,
+        Any,
     };
 
     /**
-     * The direction of the controller thumbstick input.
+     * The direction of the controller thumbstick input. Right to Down are the one way an axis is pushed, all a
+     * pushed direction is ever read as; Any, UpDown and RightLeft are what a binding accepts when it asks for
+     * the stick to be moved rather than pushed one way: every direction, or the two of one axis.
      */
     enum class Direction : std::uint8_t
     {
@@ -70,6 +78,9 @@ namespace f4cf::vrcf
         Left,
         Up,
         Down,
+        Any,
+        UpDown,
+        RightLeft,
     };
 
     /**
@@ -98,7 +109,7 @@ namespace f4cf::vrcf
         Tap, // isTap - quick press-and-release (held < 0.3s); the "Tap" gesture
         LongPress, // isLongPressed - button held longer than `duration`
         DoublePress, // isDoublePressed - two presses within `duration`
-        AxisDirection, // isAxisPressed - `axis` pushed past `threshold` in `direction`
+        AxisDirection, // isAxisPressed - `axis` pushed past `threshold` in `direction` (or any of the ones it accepts)
     };
 
     /**
@@ -139,6 +150,8 @@ namespace f4cf::vrcf
         float duration = 0.0f;
         float threshold = 0.85f; // AxisDirection only
         float cooldown = 0.15f; // AxisDirection only
+        // AxisDirection only: a held push repeats faster the longer it is held (see AxisRepeat); false keeps it at `cooldown`
+        bool accelerate = true;
 
         // When a consumer applies suppression for this binding (e.g. WandActivationSphere while the bound
         // hand is inside its zone), hide the physical button from the game. Off by default.
@@ -153,10 +166,19 @@ namespace f4cf::vrcf
         }
 
         /**
+         * The same binding on `hand`: what a binding of any hand is on each of its hands. A modifier with no
+         * hand of its own goes with it.
+         */
+        InputBinding on(const Hand onHand) const
+        {
+            InputBinding binding = *this;
+            binding.hand = onHand;
+            return binding;
+        }
+
+        /**
          * Value equality across all fields (hand, activation type, button/axis, modifier, and timing).
          */
         bool operator==(const InputBinding&) const = default;
     };
-
-
 }

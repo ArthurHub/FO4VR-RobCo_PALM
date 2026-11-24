@@ -48,6 +48,12 @@ target_link_libraries(wheel_imgui_dx11 PUBLIC wheel_imgui d3d11 dxgi d3dcompiler
 add_library(wheel_view STATIC src/WheelView.cpp src/PalmTheme.cpp src/Fonts.cpp src/WheelConfig.cpp src/IconAtlas.cpp src/SectionRegistry.cpp src/DeveloperActions.cpp src/PalmControls.cpp external/F4VR-Input/InputBindingParser.cpp)
 target_include_directories(wheel_view PUBLIC src external/F4VR-Input
  "${WORKSPACE}/libraries_and_tools/F4VR-CommonFramework/external/openvr")
+# The binding parser reads CommonFramework's binding tables with toml++. Its
+# implementation is the one RPS::Settings compiles once (TomlImpl.cpp), so
+# PALM includes the declarations only and links no second copy.
+find_path(TOMLPLUSPLUS_INCLUDE_DIR toml++/toml.hpp REQUIRED)
+target_include_directories(wheel_view PUBLIC "${TOMLPLUSPLUS_INCLUDE_DIR}")
+target_compile_definitions(wheel_view PUBLIC TOML_HEADER_ONLY=0)
 target_link_libraries(wheel_view PUBLIC wheel_imgui RPS::Settings windowscodecs ole32)
 # The desktop preview, the capture tool and wheel tests draw PALM's pages without the game.
 add_library(palm_preview INTERFACE)
