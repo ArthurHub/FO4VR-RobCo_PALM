@@ -13,7 +13,8 @@
   on it comes to your hand; with it off PALM equips it, as before. PALM no longer
   reads ROCK's settings to decide.
 - **Config** opens on PALM's Wheel items and Wheel settings, with the Spawner and the
-  Console. The other RPS mods' settings moved to each mod's page in Mods Config FO4 VR.
+  Console. The other RPS mods' settings moved to each mod's page in Mods Config FO4 VR;
+  ROCK 1.0.4 keeps a ROCK tab there with its setup wizard.
 
 ## 2.0.1
 
