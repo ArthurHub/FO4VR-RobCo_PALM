@@ -33,7 +33,7 @@ PALM saves its controls and pointer calibration to `Documents\My Games\Fallout4V
 
 New configurations use `[Controls] InputMode = 1`. Presets do not use `Mode` or `OpenMenu` as their binding; those keys store Custom's settings. The first start after an update carries your `PALM.ini` settings into `PALM.toml` and deletes the INI; an INI from before input modes keeps its binding through the matching preset or Custom.
 
-**Config** opens the ROCK Family Configurator, RPS UI Framework's settings menu, at the wheel: PALM's Wheel items and Wheel settings, the Spawner and the Console. The ROCK Family Configurator holotape in the Pip-Boy opens the same menu. The other RPS mods' settings are on each mod's page in Mods Config FO4 VR. The Console's shortcut buttons are now in `Documents\My Games\Fallout4VR\Mods_Config\RPS_UI_Framework\ConsoleCommands.ini`; shortcuts you wrote in PALM's folder are copied there the first time.
+**Config** opens RPS UI Framework's menu at the wheel: PALM's Wheel items and Wheel settings, the Spawner and the Console. The other RPS mods' settings are on each mod's page in Mods Config FO4 VR. The Console's shortcut buttons are now in `Documents\My Games\Fallout4VR\Mods_Config\RPS_UI_Framework\ConsoleCommands.ini`; shortcuts you wrote in PALM's folder are copied there the first time.
 
 ROCK's trigger-equip and bipod clicks, and an object placement on the same hand, take priority over opening PALM. A bound hand inside a Virtual Holsters zone or unrelated held buttons can also block opening. Release the opening buttons fully before trying again.
 
