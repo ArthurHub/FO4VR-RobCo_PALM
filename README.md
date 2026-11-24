@@ -82,4 +82,4 @@ Third-party components retain their respective licenses; their notices are in
 
 ## Current ROCK integration
 
-Optional ROCK integration negotiates feature interfaces through `ROCKAPI_QueryInterfaceV1`. Configuration binds its own Read/Write permissions and uses ROCK's compiled catalog and writer; there is no separate configuration discovery export. The section API remains PALM-owned and independent of ROCK and RPS UI tables.
+Optional ROCK integration negotiates feature interfaces through `ROCKAPI_QueryInterfaceV1`. PALM reads and writes no ROCK settings. The section API remains PALM-owned and independent of ROCK and RPS UI tables.
