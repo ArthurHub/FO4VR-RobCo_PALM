@@ -29,9 +29,6 @@ inline constexpr std::array kRpsModDisplayOrder{
  RpsMod::Rock,RpsMod::RockDeveloper,
  RpsMod::Paper,RpsMod::Csah,RpsMod::Diamond,RpsMod::Emitters,RpsMod::Scissors,RpsMod::ScissorsDeveloper,RpsMod::RpsUi
 };
-inline constexpr bool isRockConfiguration(RpsMod mod) {
- return mod==RpsMod::Rock || mod==RpsMod::RockDeveloper;
-}
 inline constexpr bool isScissorsConfiguration(RpsMod mod) {
  return mod==RpsMod::Scissors || mod==RpsMod::ScissorsDeveloper;
 }

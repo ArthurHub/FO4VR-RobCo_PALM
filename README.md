@@ -17,7 +17,7 @@ RobCo P.A.L.M. is a customisable wheel menu for Fallout 4 VR, with quick access 
 
 Fallout 4 VR, F4SEVR, and RPS UI Framework.
 
-ROCK 1.0 adds physical item handling; hand gestures also need FRIK 0.79.1 or newer with FRIK API 2.3.
+ROCK 1.0.4 or newer adds physical item handling; hand gestures also need FRIK 0.79.1 or newer with FRIK API 2.3.
 
 ## Using PALM
 

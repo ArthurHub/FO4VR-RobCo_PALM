@@ -1,4 +1,4 @@
-#include "tools/RockConfigurationClient.h"
+#include "tools/LoadedRpsMods.h"
 #include "RockServices.h"
 #include "PCH.h"
 #include "Runtime.h"
@@ -14,7 +14,6 @@
 #include "Renderer.h"
 #include "WheelSelectionState.h"
 #include "Gestures.h"
-#include "GrenadeSelection.h"
 #include "RockInputPolicy.h"
 #include "RockFrame.h"
 #include "SettingsMenu.h"
@@ -237,7 +236,9 @@ std::optional<rpsui::api::framework::PanelPose> poseFor(const rpsui::api::input:
  for(float v:p.center)if(!std::isfinite(v) || std::fabs(v)>1.e8f)return {};
  return p;
 }
-void requestInventoryHandoff(std::uint32_t id,const wheel::RockFrame& frame) {
+// Asks ROCK to put the item into a free hand. FeatureDisabled is ROCK declining a
+// grenade because the player has its Immersive Grenades off: the caller equips it.
+rock::api::Status requestInventoryHandoff(std::uint32_t id,const wheel::RockFrame& frame) {
  auto& s=state();
  rock::api::grab::InventoryGrabRequest request;
  request.baseFormId=id;
@@ -245,9 +246,12 @@ void requestInventoryHandoff(std::uint32_t id,const wheel::RockFrame& frame) {
  request.providerGeneration=frame.sample.providerGeneration;
  const auto result=rockServices().grab->requestInventoryGrab(s.owner,&request,&s.command);
  if(result!=rock::api::Status::RequestQueued) {
-  s.command=0;actionStatus(result==rock::api::Status::HandBusy?"Hands are busy — try again":"Item handoff unavailable");
+  s.command=0;
+  if(result!=rock::api::Status::FeatureDisabled)
+   actionStatus(result==rock::api::Status::HandBusy?"Hands are busy — try again":"Item handoff unavailable");
  }
  spdlog::info("Selected item {:08X}: queue result {}",request.baseFormId,static_cast<unsigned>(result));
+ return result;
 }
 // The loose aid or food item in the pointing hand, otherwise in the other hand,
 // goes to the wheel slot; then the input callback stores it (serviceStore).
@@ -384,14 +388,8 @@ void submitChoice(const wheel::RockFrame& frame) {
     if(!runtime.sessionReady.load() || !runtime.inputReady.load() || runtime.generation.load()!=ticket)return;
     wheel::RockFrame current;
     if(grenade && runtime.rockReady.load() && rockServices().client.owner() &&
-       rockServices().snapshot(current) && current.providerReady) {
-     const auto connection=rock_configurator::configurationConnection();
-     const auto immersive=immersiveGrenadesEnabled(connection.api,connection.owner);
-     if(!immersive) {
-      actionStatus("ROCK grenade setting unavailable");spdlog::warn("PALM grenade selection could not read ROCK's applied Immersive Grenades setting");return;
-     }
-     if(*immersive){requestInventoryHandoff(id,current);return;}
-    }
+       rockServices().snapshot(current) && current.providerReady &&
+       requestInventoryHandoff(id,current)!=rock::api::Status::FeatureDisabled)return;
     actionStatus(useInventoryItem(id));refreshWheelInventory();
     }catch(...){spdlog::error("PALM item selection task failed");}
    });}catch(...){s.gameActionPending=false;throw;}

@@ -110,10 +110,6 @@ target_include_directories(WheelSectionTests PRIVATE src)
 target_compile_features(WheelSectionTests PRIVATE cxx_std_23)
 add_test(NAME Wheel.Sections COMMAND WheelSectionTests)
 set_tests_properties(Wheel.Sections PROPERTIES TIMEOUT 30)
-add_executable(WheelGrenadeSelectionTests tests/GrenadeSelectionTests.cpp)
-target_include_directories(WheelGrenadeSelectionTests PRIVATE src "${ROCK_INCLUDE_DIR}")
-target_compile_features(WheelGrenadeSelectionTests PRIVATE cxx_std_23)
-add_test(NAME Wheel.GrenadeSelection COMMAND WheelGrenadeSelectionTests)
 # Every public header compiled on its own under a hostile packing, plus the
 # minimal consumer. The headers' static_asserts are the ABI layout checks.
 file(GLOB PALM_PUBLIC_HEADERS CONFIGURE_DEPENDS "${PALM_PUBLIC_INCLUDE_DIR}/RobCoPALM/*.h")

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Requirements
+
+- With ROCK installed, PALM needs ROCK 1.0.4 or newer. With an older ROCK it runs
+  without ROCK's item handling, as it does without ROCK.
+
+### Changed
+
+- Choosing a grenade on the wheel asks ROCK for it. With ROCK's Immersive Grenades
+  on it comes to your hand; with it off PALM equips it, as before. PALM no longer
+  reads ROCK's settings to decide.
+
 ## 2.0.1
 
 ### Changed
