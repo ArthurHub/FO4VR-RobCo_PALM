@@ -306,7 +306,7 @@ int main(){try {
  check(applyControls(Controls{}) && takeControlsSaveRequest(),"edit did not queue persistence");persistControls();initializeControls(path);
  check(snapshotControls()==Controls{},"controls were not restored from disk");
  check(snapshotPointerAim()==PointerAim{},"missing pointer keys did not use default calibration");
- check(nativePointerPitch(snapshotPointerAim().pitch[0])==-70.f && nativePointerPitch(snapshotPointerAim().pitch[1])==-70.f,"zero adjustment did not apply the forward baseline to both hands");
+ check(std::fabs(nativePointerPitch(snapshotPointerAim().pitch[0])+45.f)<1e-4f && std::fabs(nativePointerPitch(snapshotPointerAim().pitch[1])+45.f)<1e-4f,"the default pitch did not apply over the forward baseline to both hands");
  check(nativePointerPitch(-90.f)==-160.f && nativePointerPitch(90.f)==20.f,"pitch correction range was clipped around the forward baseline");
  (void)takePointerAimChange();
  PointerAim aim;aim.pitch={-75,-68};aim.yaw={-2,4};

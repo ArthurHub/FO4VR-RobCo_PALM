@@ -4,11 +4,14 @@
 // PALM's config spec (data/ModsConfigFO4/Config/RobCo_PALM/spec.json). The page edits
 // PALM.toml itself; after each Save the client reads PALM.toml again, so the controls and
 // pointer aim, the log level and the Developer section follow without a restart. It also gives
-// the page its version line and its Open the wheel and Open settings buttons, which minimize
-// the menu while the wheel or RPS UI's settings menu is open. Without Mods Config nothing is called, and PALM.toml is edited by hand.
+// the page its version line, the rows of its dynamic pages, and the functions of its Open the
+// wheel and RPS UI settings (legacy) buttons, which minimize the menu while the wheel or RPS UI's
+// settings menu is open. The wheel's Config opens the menu at PALM's page. Without Mods
+// Config nothing is called, and PALM.toml is edited by hand.
 // Threads: Mods Config calls on the game's main thread, and restoreMenu is called there too.
 
 namespace wheel::mods_config_client {
 void connect() noexcept;
 void restoreMenu() noexcept;
+bool openMenu() noexcept;
 }

@@ -13,27 +13,15 @@
   "applies": "save",
   "content": [
     {
+      "type": "image",
+      "texture": "RobCo_PALM/banner.dds",
+      "width": 700
+    },
+    {
       "type": "text",
       "text": "<font color='#AAAAAA' size=13>Version: {clientState:modVersion}</font>",
       "html": true
     },
-    {
-      "type": "button",
-      "text": "Open the wheel",
-      "help": "Minimizes this menu and opens the wheel in front of you, to try your controls and pointer aim. Select by clicking; this menu comes back when the wheel closes.",
-      "buttonText": "Open",
-      "icon": "window",
-      "action": { "type": "CallNativeFunction", "function": "openWheel" }
-    },
-    {
-      "type": "button",
-      "text": "Wheel items and sections",
-      "help": "Minimizes this menu and opens PALM's Wheel items and Wheel settings in RPS UI's settings menu, in front of you. This menu comes back when that one closes.",
-      "buttonText": "Open",
-      "icon": "gear",
-      "action": { "type": "CallNativeFunction", "function": "openSettings" }
-    },
-    { "type": "spacer" },
     {
       "type": "section",
       "text": "About",
@@ -55,6 +43,14 @@
           "help": "Opens PALM's page in your browser. Take off the headset to read it on your monitor.",
           "buttonText": "Open",
           "action": { "type": "OpenURL", "url": "https://github.com/brunocatani/RobCo_PALM" }
+        },
+        {
+          "type": "button",
+          "text": "RPS UI settings (legacy)",
+          "help": "Kept for compatibility: opens RPS UI's settings menu in front of you, with PALM's earlier Wheel items and Wheel settings pages, the Spawner and the Console. This menu minimizes, and comes back when that one closes.",
+          "buttonText": "Open",
+          "icon": "gear",
+          "action": { "type": "CallNativeFunction", "function": "openSettings" }
         },
         { "type": "spacer" },
         {
@@ -156,7 +152,7 @@
     {
       "id": "controls",
       "pageDisplayName": "Controls",
-      "help": "How the wheel opens and how you select on it.",
+      "help": "How the wheel opens, how you select on it, and where each controller points.",
       "content": [
         {
           "id": "inputMode",
@@ -228,67 +224,67 @@
               "storage": { "path": ["Controls", "Mode"] }
             }
           ]
-        }
-      ]
-    },
-    {
-      "id": "pointerAim",
-      "pageDisplayName": "Pointer aim",
-      "help": "Where each controller points on the wheel.",
-      "content": [
-        {
-          "type": "text",
-          "text": "0° points straight forward. A negative pitch lowers the pointer, and a positive yaw moves it right."
         },
         {
           "type": "section",
-          "text": "Left hand",
+          "text": "Pointer aim",
+          "help": "Where each controller points on the wheel.",
           "content": [
             {
-              "type": "slider",
-              "valueType": "float",
-              "text": "Pitch",
-              "help": "Tilts the left hand's pointer up or down.",
-              "default": 0.0,
-              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
-              "display": { "decimals": 1, "unit": "°" },
-              "storage": { "path": ["Pointer", "LeftPitchDegrees"] }
+              "type": "text",
+              "text": "0° points straight forward. A negative pitch lowers the pointer, and a positive yaw moves it right."
             },
             {
-              "type": "slider",
-              "valueType": "float",
-              "text": "Yaw",
-              "help": "Turns the left hand's pointer left or right.",
-              "default": 0.0,
-              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
-              "display": { "decimals": 1, "unit": "°" },
-              "storage": { "path": ["Pointer", "LeftYawDegrees"] }
-            }
-          ]
-        },
-        {
-          "type": "section",
-          "text": "Right hand",
-          "content": [
-            {
-              "type": "slider",
-              "valueType": "float",
-              "text": "Pitch",
-              "help": "Tilts the right hand's pointer up or down.",
-              "default": 0.0,
-              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
-              "display": { "decimals": 1, "unit": "°" },
-              "storage": { "path": ["Pointer", "RightPitchDegrees"] }
+              "type": "section",
+              "text": "Left hand",
+              "content": [
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Pitch",
+                  "help": "Tilts the left hand's pointer up or down.",
+                  "default": 25.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "LeftPitchDegrees"] }
+                },
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Yaw",
+                  "help": "Turns the left hand's pointer left or right.",
+                  "default": 15.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "LeftYawDegrees"] }
+                }
+              ]
             },
             {
-              "type": "slider",
-              "valueType": "float",
-              "text": "Yaw",
-              "help": "Turns the right hand's pointer left or right.",
-              "default": 0.0,
-              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
-              "display": { "decimals": 1, "unit": "°" },
-              "storage": { "path": ["Pointer", "RightYawDegrees"] }
+              "type": "section",
+              "text": "Right hand",
+              "content": [
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Pitch",
+                  "help": "Tilts the right hand's pointer up or down.",
+                  "default": 25.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "RightPitchDegrees"] }
+                },
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Yaw",
+                  "help": "Turns the right hand's pointer left or right.",
+                  "default": -18.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "RightYawDegrees"] }
+                }
+              ]
             }
           ]
         }

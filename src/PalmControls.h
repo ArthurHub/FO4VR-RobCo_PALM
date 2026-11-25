@@ -12,8 +12,9 @@
 namespace wheel {
 enum class OpenMode { Hold, Press };
 enum class InputMode { StickClick=1, GripTriggerHold=2, Custom=3 };
+// Left, right. The defaults are the aim tested in game: both pointers raised 25 degrees, each turned in toward the middle.
 struct PointerAim {
- std::array<float,2> pitch{},yaw{};
+ std::array<float,2> pitch{25.f,25.f},yaw{15.f,-18.f};
  bool operator==(const PointerAim&) const=default;
 };
 // User pitch is relative to the tested forward aim, not the native wand axis.

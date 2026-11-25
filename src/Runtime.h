@@ -16,5 +16,5 @@ void publishWheelSelection(std::uint64_t generation,const Action& hover);
 void requestWheelClick(std::uint64_t generation,const Action& action);
 bool gameSessionReady();
 bool requestWheelOpen();
-void restoreModsConfigAfterSettings();
+bool requestSettingsMenuOpen();
 }

@@ -72,10 +72,11 @@ struct RuntimeState {
  Gestures handGestures;
  bool leftHanded{};
  std::uint32_t world{},skeleton{},provider{};
- // Mods Config's Open the wheel: the request's steady-clock seconds, 0 for none. The input callback opens the wheel
- // click-to-select (requestedOpen). After that wheel or Mods Config's Open settings, the input callback shows Mods
- // Config again once the wheel and Config have stayed closed for kRestoreDelay (restoreModsConfig, closedSince).
- std::atomic<double> openRequestedAt{0.};
+ // Mods Config's Open the wheel and RPS UI settings (legacy): each request's steady-clock seconds, 0 for none. The
+ // input callback opens the wheel click-to-select (requestedOpen), or RPS UI's settings menu once RPS UI has input
+ // back from the minimized Mods Config. After either, it shows Mods Config again once the wheel and Config have
+ // stayed closed for kRestoreDelay (restoreModsConfig, closedSince).
+ std::atomic<double> openRequestedAt{0.},settingsRequestedAt{0.};
  bool requestedOpen{};
  std::atomic_bool restoreModsConfig{false};
  double closedSince{};
@@ -308,8 +309,12 @@ void submitChoice(const wheel::RockFrame& frame) {
  if(!choice || ticket!=s.generation.load())return;
  if(choice==kConfigChoice) {
   s.handGestures.clear(s.owner);
-  (void)openSettingsMenu(&s.wheelPose);
-  spdlog::info("Selected Config; replacing wheel at its anchor");
+  // Config opens RobCo PALM's page in Mods Config; without Mods Config, RPS UI's menu with PALM's pages.
+  if(mods_config_client::openMenu())spdlog::info("Selected Config; opened RobCo PALM in Mods Config FO4 VR");
+  else {
+   (void)openSettingsMenu(&s.wheelPose);
+   spdlog::info("Selected Config; Mods Config FO4 VR unavailable, opened RPS UI's settings menu at the wheel's anchor");
+  }
  }else if(choice==kSectionChoice) {
   s.handGestures.clear(s.owner);
   const auto selected=s.sectionChoice.load();
@@ -518,6 +523,14 @@ void RPSUI_CALL onFrame(const rpsui::api::input::Frame* frame,void*) noexcept {
   }
   serviceCommand();serviceEquipCommand();if(rockReady)serviceStore();
   if(takeSettingsMenuClosed())refreshWheelInventory();
+  // RPS UI drops an open asked while its input was still Mods Config's, and answers Ok: ask each frame until it opens.
+  if(const double requestedAt=s.settingsRequestedAt.load();requestedAt>0.) {
+   if(settingsMenuOpen()){s.settingsRequestedAt=0.;s.restoreModsConfig=true;s.closedSince=0.;}
+   else if(!std::isfinite(frame->seconds) || frame->seconds-requestedAt>kOpenRequestLifetime || (!s.gesture.open && !s.open.load() && !openSettingsMenu(nullptr))) {
+    s.settingsRequestedAt=0.;spdlog::warn("PALM: RPS UI's settings menu did not open for Mods Config's RPS UI settings (legacy)");
+    mods_config_client::restoreMenu();
+   }
+  }
   const bool gameActionPending=s.gameActionPending.load(),configOpen=settingsMenuOpen(),configOpening=false;
   const bool eligible=!s.command && !s.storeCommand && !s.pendingStore.load() && !gameActionPending && !configOpen && !configOpening;
   const auto masks=controlMasks(s.controls,frame->leftHanded);
@@ -670,10 +683,14 @@ bool requestWheelOpen() {
  s.openRequestedAt=steadySeconds();return true;
 }
 /**
- * Mods Config's Open settings opened RPS UI's settings menu with Mods Config minimized: the input callback shows Mods
- * Config again once that menu, and any wheel opened meanwhile, have stayed closed for kRestoreDelay.
+ * Asks the input callback to open RPS UI's settings menu in front of the headset within kOpenRequestLifetime: Mods
+ * Config's RPS UI settings (legacy), which minimizes the menu so RPS UI's input comes back. False outside a loaded game.
  */
-void restoreModsConfigAfterSettings(){state().restoreModsConfig=true;}
+bool requestSettingsMenuOpen() {
+ auto& s=state();
+ if(!s.sessionReady.load() || s.presentationFailed.load())return false;
+ s.settingsRequestedAt=steadySeconds();return true;
+}
 void requestWheelClick(std::uint64_t ticket,const Action& action) {
  auto& s=state();std::scoped_lock lock(s.presentationMutex);
  if(s.open.load() && s.generation.load()==ticket && !s.clickRequested.load()) {

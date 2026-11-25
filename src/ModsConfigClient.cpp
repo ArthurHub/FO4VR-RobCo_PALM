@@ -3,7 +3,6 @@
 #include "DeveloperActions.h"
 #include "PalmControls.h"
 #include "Runtime.h"
-#include "SettingsMenu.h"
 #include "WheelConfig.h"
 #include "Inventory.h"
 #include <ModsConfigFO4Api.h>
@@ -45,14 +44,13 @@ FunctionResult openWheel(const Params&) {
 }
 
 /**
- * The front page's Open settings: minimizes the menu and opens RPS UI's settings menu in front of the headset, with
- * PALM's Wheel items and Wheel settings; the runtime shows the menu again once that menu closes.
+ * The front page's RPS UI settings (legacy): minimizes the menu and asks the runtime to open RPS UI's settings menu in
+ * front of the headset, with PALM's Wheel items and Wheel settings, once RPS UI has input back; the runtime shows the
+ * menu again once that menu closes, or at once when it does not open.
  */
 FunctionResult openSettings(const Params&) {
- auto& client=ModsConfigFO4Client::get();
- client.minimizeMenu();
- if(!openSettingsMenu(nullptr)){client.restoreMenu();return {false,"RPS UI's settings menu did not open; see RobCoPALM.log."};}
- restoreModsConfigAfterSettings();
+ if(!requestSettingsMenuOpen())return {false,"PALM's pages open only in a loaded game."};
+ ModsConfigFO4Client::get().minimizeMenu();
  return {true,{}};
 }
 
@@ -127,5 +125,14 @@ void connect() noexcept {
 void restoreMenu() noexcept {
  try{ModsConfigFO4Client::get().restoreMenu();}
  catch(...){spdlog::error("Showing Mods Config FO4 VR's menu again failed");}
+}
+
+/**
+ * Opens Mods Config's menu at RobCo PALM's front page, as the wheel's Config does; a minimized menu is shown. False
+ * while PALM's client is not connected.
+ */
+bool openMenu() noexcept {
+ try{return ModsConfigFO4Client::get().openMenu();}
+ catch(...){spdlog::error("Opening Mods Config FO4 VR's menu failed");return false;}
 }
 }
