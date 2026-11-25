@@ -4,6 +4,7 @@
 #include "PalmControls.h"
 #include "Runtime.h"
 #include "SettingsMenu.h"
+#include "WheelConfig.h"
 #include <ModsConfigFO4Api.h>
 
 namespace wheel::mods_config_client {
@@ -55,6 +56,21 @@ FunctionResult openSettings(const Params&) {
 }
 
 /**
+ * The Wheel sections page's rows, with a client state for each switcher: its getter reads the wheel's preferences and
+ * its setter shows or hides the section, for each live preview, Discard and Save. The co-save keeps them, so outside
+ * a loaded game the page only says to load one.
+ */
+std::optional<std::string> wheelSectionsPage() {
+ if(!gameSessionReady())return std::string(R"([{"type":"text","text":"Load a game first: each save keeps its own wheel sections."}])");
+ auto content=wheelSectionsContent();
+ auto& client=ModsConfigFO4Client::get();
+ for(const auto& name:content.states)
+  client.addState(name,[name]{const auto shown=wheelSectionShown(name);return shown?std::optional<Value>(*shown):std::nullopt;},
+   [name](const Value& value){if(const auto* shown=std::get_if<bool>(&value))showWheelSection(name,*shown);});
+ return std::move(content.json);
+}
+
+/**
  * Mods Config's F4SE message after a Save, sent to the plugins of the spec's f4sePluginRequirements. PALM learns of
  * Saves through onSaved, so it ignores the message; without a listener F4SE logs a failed dispatch.
  */
@@ -71,6 +87,7 @@ void connect() noexcept {
   client.addState("modVersion",[]{return std::optional<Value>(std::string(PALM_VERSION));});
   client.addFunction("openWheel",&openWheel);
   client.addFunction("openSettings",&openSettings);
+  client.addPageContent("wheelSections",&wheelSectionsPage);
   client.subscribeToSaves(&onSaved);
   if(const auto* messaging=F4SE::GetMessagingInterface())
    (void)messaging->RegisterListener(&onModsConfigMessage,::mods_config::api::MODS_CONFIG_FO4_F4SE_NAME);

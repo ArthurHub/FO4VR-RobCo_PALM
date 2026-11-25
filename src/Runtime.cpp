@@ -657,6 +657,10 @@ void publishWheelSelection(std::uint64_t ticket,const Action& hover) {
 }
 
 /**
+ * Whether a game is loaded, so the wheel's preferences are the save's and not placeholders a load replaces.
+ */
+bool gameSessionReady(){return state().sessionReady.load();}
+/**
  * Asks the input callback to open the wheel at the binding's hand, click-to-select, within kOpenRequestLifetime: Mods
  * Config's Open the wheel, which minimizes the menu so RPS UI's input comes back. False outside a loaded game.
  */

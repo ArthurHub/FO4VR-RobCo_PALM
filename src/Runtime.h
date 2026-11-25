@@ -14,6 +14,7 @@ void finishGameLoad(bool success);
 std::uint64_t wheelDrawGeneration();
 void publishWheelSelection(std::uint64_t generation,const Action& hover);
 void requestWheelClick(std::uint64_t generation,const Action& action);
+bool gameSessionReady();
 bool requestWheelOpen();
 void restoreModsConfigAfterSettings();
 }

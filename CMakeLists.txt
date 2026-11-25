@@ -26,6 +26,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 add_subdirectory("${COMMON_LIB_F4VR_PATH}" CommonLibF4 EXCLUDE_FROM_ALL)
 find_package(spdlog CONFIG REQUIRED)
 find_package(RPSFramework CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 set(IMGUI "${WORKSPACE}/../devtools/imgui")
 # RPS UI owns the in-game panels' ImGui contexts and renders them. PALM's copy
 # of Dear ImGui only issues calls into those contexts, so it is built with RPS
@@ -54,7 +55,7 @@ target_include_directories(wheel_view PUBLIC src external/F4VR-Input
 find_path(TOMLPLUSPLUS_INCLUDE_DIR toml++/toml.hpp REQUIRED)
 target_include_directories(wheel_view PUBLIC "${TOMLPLUSPLUS_INCLUDE_DIR}")
 target_compile_definitions(wheel_view PUBLIC TOML_HEADER_ONLY=0)
-target_link_libraries(wheel_view PUBLIC wheel_imgui RPS::Settings windowscodecs ole32)
+target_link_libraries(wheel_view PUBLIC wheel_imgui RPS::Settings nlohmann_json::nlohmann_json windowscodecs ole32)
 # The desktop preview, the capture tool and wheel tests draw PALM's pages without the game.
 add_library(palm_preview INTERFACE)
 target_include_directories(palm_preview INTERFACE src/tools "${ROCK_INCLUDE_DIR}")
@@ -149,6 +150,10 @@ add_executable(PalmControlsTests tests/PalmControlsTests.cpp preview/PreviewFont
 target_link_libraries(PalmControlsTests PRIVATE palm_preview)
 target_compile_definitions(PalmControlsTests PRIVATE PALM_CONTROLS_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/palm-controls-test")
 add_test(NAME Wheel.Controls COMMAND PalmControlsTests)
+
+add_executable(WheelSectionsPageTests tests/WheelSectionsPageTests.cpp preview/PreviewFonts.cpp)
+target_link_libraries(WheelSectionsPageTests PRIVATE palm_preview)
+add_test(NAME Wheel.SectionsPage COMMAND WheelSectionsPageTests)
 
 add_executable(PALMCapture preview/Capture.cpp preview/PreviewFonts.cpp src/IconResources.rc)
 target_link_libraries(PALMCapture PRIVATE palm_preview wheel_imgui_dx11 windowscodecs ole32)

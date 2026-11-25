@@ -33,6 +33,7 @@ struct Model {
  Category category{Category::Aid};
  std::array<bool,kCategoryCount> enabled{true,true,true,true,true};
  bool gesturesEnabled{false};
+ bool configShown{true};
  bool equipmentNamesAvailable{true};
  // Hold mode selects when the opening chord is released; press mode on a trigger click.
  bool holdToSelect{};
@@ -72,11 +73,12 @@ inline NavigationLayout navigationLayout(const Model& model) {
   }
   layout.entries[layout.count++]=id;
  }
- for(unsigned i=0;i<model.sections.count && layout.count+1<layout.entries.size();++i)
+ const unsigned configPlaces=model.configShown?1:0;
+ for(unsigned i=0;i<model.sections.count && layout.count+configPlaces<layout.entries.size();++i)
   if(model.sections.sections[i].enabled)layout.entries[layout.count++]=kExternalNavigation+i;
- layout.entries[layout.count++]=kConfigNavigation;
- // Config is always present. Keep the physical hand entries on their own sides
- // even when an odd number of visible sectors prevents exact opposition.
+ // Config stays when nothing else is shown, so the ring is never empty. Keep the physical hand entries on
+ // their own sides even when an odd number of visible sectors prevents exact opposition.
+ if(model.configShown || !layout.count)layout.entries[layout.count++]=kConfigNavigation;
  layout.step=2*kPi/layout.count;
  if(model.gesturesEnabled)layout.start=kPi/2-(right+left)*layout.step/2;
  return layout;

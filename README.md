@@ -9,7 +9,7 @@ RobCo P.A.L.M. is a customisable wheel menu for Fallout 4 VR, with quick access 
 - Choose up to eight items per category and hide sections you do not use.
 - Equip weapons and armor, use consumables, or bring items into your hand with ROCK. With ROCK, a weapon chosen on the wheel goes into the hand you point with.
 - Hold a weapon, or a loose aid or food item, and select an empty slot on its page to add it to the wheel; it is put away. Needs ROCK for aid and food.
-- Use eight hand gestures with ROCK and FRIK (off by default; turn them on in Config → Wheel settings → Wheel sections).
+- Use eight hand gestures with ROCK and FRIK (off by default; turn them on on RobCo PALM's Wheel sections page in Mods Config FO4 VR).
 - Change PALM controls in game; **Config** opens RPS UI's menu on PALM's wheel pages, with the Spawner and the Console.
 - Add wheel sections through supported mods.
 
@@ -29,7 +29,7 @@ Choose your items in **Config → Wheel items**. Select either preset or **Mode 
 
 In **Click to select**, release the opening buttons before selecting with the pointing hand's trigger or A/X. The wheel stays open until you click **Cancel** or enter Config. Opening bindings support press, tap, double tap, hold, long press, and release, with an optional modifier on either hand. Touch and axis inputs are excluded; thumbstick click is supported. Tap and release bindings use click-to-select.
 
-PALM's controls, pointer aim, log level and Developer switch are on RobCo PALM's page in Mods Config FO4 VR, and apply when you save there; its **Open the wheel** button sets the menu aside and opens the wheel to try them, and **Wheel items and sections** opens PALM's pages in RPS UI's menu. They are kept in `Documents\My Games\Fallout4VR\Mods_Config\RobCo_PALM\PALM.toml`; manual edits are read at startup. Each option has its help above it, and `[Developer] Enabled` adds the Developer section to the wheel; actions a mod adds only at startup, as ROCK's, appear after a restart.
+PALM's controls, pointer aim, log level and Developer switch are on RobCo PALM's page in Mods Config FO4 VR, and apply when you save there; its **Open the wheel** button sets the menu aside and opens the wheel to try them, and **Wheel items and sections** opens PALM's pages in RPS UI's menu. They are kept in `Documents\My Games\Fallout4VR\Mods_Config\RobCo_PALM\PALM.toml`; manual edits are read at startup. The Wheel sections page there chooses which sections the ring shows, Config among them, and has its own Open the wheel to see them; each save keeps its own, as before. Without Config on the ring, PALM's settings are opened from Mods Config FO4 VR. Each option has its help above it, and `[Developer] Enabled` adds the Developer section to the wheel; actions a mod adds only at startup, as ROCK's, appear after a restart.
 
 New configurations use `[Controls] InputMode = 1`. Presets do not use `Mode` or `OpenMenu` as their binding; those keys store Custom's settings. `OpenMenu` is a binding table in F4VR-CommonFramework's form, such as `{ hand = "right", type = "release", button = "thumbstick" }`; a one-line binding an earlier PALM wrote becomes that table at the first start. The first start after an update carries your `PALM.ini` settings into `PALM.toml` and deletes the INI; an INI from before input modes keeps its binding through the matching preset or Custom.
 

@@ -110,6 +110,13 @@
   ],
   "pages": [
     {
+      "id": "wheelSections",
+      "pageDisplayName": "Wheel sections",
+      "help": "Which sections the ring shows. Changes show on the wheel as you make them.",
+      "applies": "live",
+      "contentFromClientCallback": true
+    },
+    {
       "id": "controls",
       "pageDisplayName": "Controls",
       "help": "How the wheel opens and how you select on it.",

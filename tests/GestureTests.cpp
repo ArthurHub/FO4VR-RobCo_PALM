@@ -151,6 +151,11 @@ void checkSelection() {
  require(!emptyAction.hoveredItem && !emptyAction.hoveredGesture && !emptyAction.section,"hidden content remained selectable");
  const auto emptyLayout=navigationLayout(model);const auto configAngle=emptyLayout.angle(0);
  require(draw(512+std::cos(configAngle)*119,510+std::sin(configAngle)*119).configHovered,"all-hidden wheel lost Config");
+ model.configShown=false;
+ require(navigationLayout(model).count==1 && navigationLayout(model).entries[0]==kConfigNavigation,"a hidden Config left the ring empty");
+ model.enabled[0]=true;
+ require(navigationLayout(model).count==1 && navigationLayout(model).entries[0]!=kConfigNavigation,"a hidden Config stayed on the ring");
+ model.configShown=true;
  // Mod items use their own action identity and the same drawn-selection lifetime.
  model.enabled.fill(true);model.gesturesEnabled=true;model.sections.count=2;
  for(unsigned i=0;i<2;++i) {

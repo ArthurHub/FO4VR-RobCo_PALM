@@ -15,7 +15,12 @@ int main(){try {
  prefs.enabled[1]=false;
  std::ostringstream saved;writePreferences(saved,prefs);
  Preferences loaded;std::istringstream source(saved.str());check(readPreferences(source,loaded));
- check(loaded.slots[0].size()==8 && !loaded.enabled[1]);
+ check(loaded.slots[0].size()==8 && !loaded.enabled[1] && loaded.configShown);
+ check(saved.str().find("config")==std::string::npos);
+ prefs.configShown=false;
+ std::ostringstream hidden;writePreferences(hidden,prefs);
+ Preferences hiddenIn;std::istringstream hiddenSource(hidden.str());check(readPreferences(hiddenSource,hiddenIn) && !hiddenIn.configShown);
+ prefs.configShown=true;
  for(unsigned c=1;c<kCategoryCount;++c)for(unsigned i=0;i<kSlots;++i)
   check(prefs.select(c,{"variant|"+std::to_string(i),"Equipment "+std::to_string(i)},true));
  std::ostringstream full;writePreferences(full,prefs);

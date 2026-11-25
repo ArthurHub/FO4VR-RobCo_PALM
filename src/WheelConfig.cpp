@@ -3,8 +3,10 @@
 #include "PalmControls.h"
 #include <imgui.h>
 #include "tools/render/ConfigUi.h"
+#include <nlohmann/json.hpp>
 #include <mutex>
 #include <atomic>
+#include <format>
 
 namespace wheel {
 namespace {
@@ -16,7 +18,7 @@ struct State {
 };
 State& state(){static State s;return s;}
 void limitSections(Model& model) {
- unsigned used=1+static_cast<unsigned>(std::count(model.enabled.begin(),model.enabled.end(),true))+(model.gesturesEnabled?2:0);
+ unsigned used=(model.configShown?1u:0u)+static_cast<unsigned>(std::count(model.enabled.begin(),model.enabled.end(),true))+(model.gesturesEnabled?2:0);
  for(unsigned i=0;i<model.sections.count;++i)if(model.sections.sections[i].enabled && !isDeveloperSection(model.sections.sections[i].id)) {
   model.sections.sections[i].enabled=used<palm::api::menu::kMaxVisibleEntries;++used;
  }
@@ -82,6 +84,86 @@ void refreshWheelSections(Model& model) {
  limitSections(model);
 }
 bool takeWheelConfigChange(){return state().changed.exchange(false);}
+namespace {
+// The item categories in the order the page lists them, with the names of their client states.
+constexpr std::array<std::pair<Category,std::string_view>,kCategoryCount> kPageCategories{{
+ {Category::Weapons,"section.weapons"},{Category::Armor,"section.armor"},{Category::Aid,"section.aid"},
+ {Category::Food,"section.food"},{Category::Grenades,"section.grenades"}}};
+constexpr std::string_view kGesturesState="section.gestures",kConfigState="section.config",kModStatePrefix="section.mod.";
+std::string titleCase(std::string_view upper) {
+ std::string result(upper);
+ for(std::size_t i=1;i<result.size();++i)if(result[i]>='A' && result[i]<='Z')result[i]=static_cast<char>(result[i]+32);
+ return result;
+}
+}
+/**
+ * Mods Config's Wheel sections rows: Open the wheel, then a section limited to the ring's places with the categories,
+ * Gestures (two places, while ROCK and FRIK serve gestures), the registered mod sections and Config, then the shown
+ * sections whose mod has not registered them, which take no place, so the player can forget them.
+ */
+WheelSectionsContent wheelSectionsContent() {
+ auto& s=state();std::scoped_lock lock(s.mutex);
+ WheelSectionsContent result;
+ const auto row=[&](std::string_view stateName,std::string_view text,std::string_view help,bool fallback) {
+  result.states.emplace_back(stateName);
+  return nlohmann::json{{"id",stateName},{"type","switcher"},{"valueType","bool"},{"text",text},{"help",help},
+   {"default",fallback},{"storage",{{"clientState",stateName}}}};
+ };
+ auto ring=nlohmann::json::array();
+ for(const auto& [category,stateName]:kPageCategories)ring.push_back(row(stateName,titleCase(categoryName(category)),"Inventory items you choose on Wheel items.",true));
+ if(gestureIntegrationAvailable()) {
+  auto gestures=row(kGesturesState,"Gestures","The left and right hand menus of ROCK and FRIK. Takes two places.",false);
+  gestures["countsAs"]=2;ring.push_back(std::move(gestures));
+ }
+ SectionCatalog catalog;
+ const bool registered=sectionRegistry().snapshot(catalog);
+ for(unsigned i=0;registered && i<catalog.count;++i) {
+  const auto& section=catalog.sections[i];if(isDeveloperSection(section.id))continue;
+  ring.push_back(row(std::string(kModStatePrefix)+section.id,section.name,std::format("Added by {}.",section.modName),false));
+ }
+ ring.push_back(row(kConfigState,"Config","Opens PALM's settings from the wheel. Without it, open them from Mods Config FO4 VR. The ring keeps it when nothing else is shown.",true));
+ auto content=nlohmann::json::array();
+ content.push_back({{"type","button"},{"text","Open the wheel"},{"buttonText","Open"},{"icon","window"},
+  {"help","Minimizes this menu and opens the wheel, to see your changes on it. This menu comes back when the wheel closes."},
+  {"action",{{"type","CallNativeFunction"},{"function","openWheel"}}}});
+ content.push_back({{"type","text"},{"text",std::format("The ring has room for {} sections, Config with them; Cancel is in its center. Hiding a section keeps its items.",palm::api::menu::kMaxVisibleEntries)}});
+ content.push_back({{"type","section"},{"text","On the ring"},{"maxOn",palm::api::menu::kMaxVisibleEntries},{"content",std::move(ring)}});
+ auto waiting=nlohmann::json::array();
+ for(const auto& id:s.prefs.sections) {
+  if(registered && std::any_of(catalog.sections.begin(),catalog.sections.begin()+catalog.count,[&](const auto& section){return id==section.id;}))continue;
+  waiting.push_back(row(std::string(kModStatePrefix)+id,id,"Its mod has not added it in this game session, so it takes no place. Turn it off to forget it.",false));
+ }
+ if(!waiting.empty())content.push_back({{"type","section"},{"text","Not added now"},{"content",std::move(waiting)}});
+ if(developerActions().enabled())content.push_back({{"type","text"},{"text","The Developer section takes a free place on the ring when there is one."}});
+ result.json=content.dump();
+ return result;
+}
+/**
+ * Whether the wheel shows the section of a Wheel sections client state; none for a name that is not one.
+ */
+std::optional<bool> wheelSectionShown(std::string_view stateName) {
+ auto& s=state();std::scoped_lock lock(s.mutex);
+ if(stateName==kGesturesState)return s.prefs.gesturesEnabled;
+ if(stateName==kConfigState)return s.prefs.configShown;
+ if(stateName.starts_with(kModStatePrefix))return s.prefs.sectionEnabled(stateName.substr(kModStatePrefix.size()));
+ for(const auto& [category,name]:kPageCategories)if(stateName==name)return s.prefs.enabled[static_cast<unsigned>(category)];
+ return std::nullopt;
+}
+/**
+ * Shows or hides the section of a Wheel sections client state, as Mods Config previews, discards and saves it. Mods
+ * Config already holds the ring's limit, and the wheel fits what does not, so a mod section is added without it.
+ */
+void showWheelSection(std::string_view stateName,bool shown) {
+ auto& s=state();std::scoped_lock lock(s.mutex);
+ bool changed=false;
+ if(stateName==kGesturesState){changed=s.prefs.gesturesEnabled!=shown;s.prefs.gesturesEnabled=shown;}
+ else if(stateName==kConfigState){changed=s.prefs.configShown!=shown;s.prefs.configShown=shown;}
+ else if(stateName.starts_with(kModStatePrefix))changed=s.prefs.setSectionEnabled(stateName.substr(kModStatePrefix.size()),shown,0);
+ else for(const auto& [category,name]:kPageCategories)if(stateName==name) {
+  auto& enabled=s.prefs.enabled[static_cast<unsigned>(category)];changed=enabled!=shown;enabled=shown;
+ }
+ if(changed)s.changed=true;
+}
 void drawWheelSettings() {
  auto& s=state();std::unique_lock lock(s.mutex,std::try_to_lock);if(!lock.owns_lock())return;
  using namespace devui;
@@ -97,7 +179,7 @@ void drawWheelSettings() {
  if(s.settingsPage){if(s.settingsPage==1)drawControls();else drawPointerAim();ImGui::EndChild();ImGui::PopStyleVar();return;}
  SectionCatalog catalog;if(!sectionRegistry().snapshot(catalog)){ImGui::EndChild();ImGui::PopStyleVar();return;}
  const auto enabledCount=[&] {
-  unsigned count=1+static_cast<unsigned>(std::count(s.prefs.enabled.begin(),s.prefs.enabled.end(),true))+(s.prefs.gesturesEnabled && gestureIntegrationAvailable()?2:0);
+  unsigned count=(s.prefs.configShown?1u:0u)+static_cast<unsigned>(std::count(s.prefs.enabled.begin(),s.prefs.enabled.end(),true))+(s.prefs.gesturesEnabled && gestureIntegrationAvailable()?2:0);
   for(unsigned i=0;i<catalog.count;++i)count+=(isDeveloperSection(catalog.sections[i].id)?developerActions().enabled():s.prefs.sectionEnabled(catalog.sections[i].id))?1:0;
   return count;
  };
