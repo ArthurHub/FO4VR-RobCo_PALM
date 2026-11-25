@@ -45,7 +45,8 @@ std::vector<settings::Definition> palmDefinitions() {
   result.push_back({"Pointer",pitchKeys[hand],"02. Pointer Aim",std::format("Tilts the {} hand's pointer up or down, in degrees. Range: -90 to 90.",side),player,settings::ValueType::Float,angleText(aim.pitch[hand])});
   result.push_back({"Pointer",yawKeys[hand],"02. Pointer Aim",std::format("Turns the {} hand's pointer left or right, in degrees. Range: -90 to 90.",side),player,settings::ValueType::Float,angleText(aim.yaw[hand])});
  }
- result.push_back({"Developer","Enabled","03. Developer","Adds the Developer section to the wheel. Restart the game after changing it.",player,settings::ValueType::Boolean,"false"});
+ result.push_back({"Developer","Enabled","03. Developer","Adds the Developer section to the wheel, which lists the actions mods add to it.\n"
+  "Applies when Mods Config saves; a mod that adds its actions only at startup, as ROCK does, shows them after a restart.",player,settings::ValueType::Boolean,"false"});
  result.push_back({"Logging","LogLevel","04. Logging","How much PALM writes to RobCoPALM.log: 2 = Info, 3 = Warnings, 4 = Errors, 6 = Off.\n"
   "Numbered as in ROCK and FRIK; 0 = Trace and 1 = Debug write the same as Info. Applies when Mods Config saves.",player,settings::ValueType::Integer,"2"});
  return result;
@@ -220,6 +221,10 @@ int logLevel(const settings::Store& store) {
  * The log level PALM.toml held at its last read; 2 (info) before initializeControls opened it.
  */
 int snapshotLogLevel(){auto& s=state();std::scoped_lock lock(s.mutex);return s.store?logLevel(*s.store):2;}
+/**
+ * [Developer] Enabled as PALM.toml held it at its last read; off before initializeControls opened it.
+ */
+bool snapshotDeveloperEnabled(){auto& s=state();std::scoped_lock lock(s.mutex);return s.store && s.store->find("Developer","Enabled")->value=="true";}
 bool applyControls(const Controls& controls,bool queueSave) {
  Controls validated;std::string error;
  if(!parseControls(controls.mode==OpenMode::Hold?"hold":"press",bindingText(controls),validated,error)){auto& s=state();std::scoped_lock lock(s.mutex);s.status=error;return false;}

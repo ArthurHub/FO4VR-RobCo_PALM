@@ -4,7 +4,7 @@ Header: `RobCoPALM/Developer.h`. Namespace: `palm::api::developer`. Version 2.0.
 
 Actions on the shared Developer wheel, for local diagnostics such as a capture switch. All mods share one wheel of `kCapacity` actions, shown only when PALM's Developer mode is on. Bind it the same way as the [Menu](Menu.md) interface.
 
-`enabled` reports whether Developer mode is on.
+`enabled` reports whether Developer mode is on. The player can turn it on or off in game, on PALM's page in Mods Config FO4 VR: actions registered while it was on stay registered and come back with it, and a mod that registers only at startup gets its actions on the wheel after a restart.
 
 `registerAction` takes an `Action`: a stable, mod-qualified `id`, a `label` that includes the mod's name, an `invoke` callback and a `context`. It returns a handle. Registration survives game loads and never replaces another ID.
 

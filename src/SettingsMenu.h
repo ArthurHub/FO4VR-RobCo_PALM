@@ -9,8 +9,7 @@ namespace wheel {
 // False leaves the wheel working without the Config entry's menu.
 bool installSettingsPages();
 void uninstallSettingsPages();
-// Game thread: opens the menu where the wheel was.
-bool openSettingsMenu(const rpsui::api::framework::PanelPose& pose);
+bool openSettingsMenu(const rpsui::api::framework::PanelPose* pose);
 [[nodiscard]] bool settingsMenuOpen();
 // True once after each close of the menu, which may have changed the inventory.
 [[nodiscard]] bool takeSettingsMenuClosed();

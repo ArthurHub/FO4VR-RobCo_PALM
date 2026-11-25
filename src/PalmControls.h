@@ -136,6 +136,7 @@ void initializeControls(const std::filesystem::path& path);
 std::vector<std::string> reloadControls();
 int logLevel(const RPS::Settings::Store& store);
 int snapshotLogLevel();
+bool snapshotDeveloperEnabled();
 bool applyControls(const Controls& controls,bool queueSave=true); // Memory only; explicit save is queued for the game task.
 bool takeControlsSaveRequest();
 void persistControls();

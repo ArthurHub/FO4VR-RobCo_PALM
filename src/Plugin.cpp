@@ -80,7 +80,7 @@ extern "C" __declspec(dllexport) bool F4SEAPI F4SEPlugin_Load(const F4SE::LoadIn
    }catch(const std::exception& error){spdlog::error("PALM settings unavailable: {}",error.what());}
   }
   if(!wheel::developerActions().initialize(developer))spdlog::error("PALM Developer section unavailable; existing mod sections preserved");
-  spdlog::info("PALM Developer wheel {} (PALM.toml [Developer] Enabled; restart required)",developer?"enabled":"disabled");
+  spdlog::info("PALM Developer wheel {} (PALM.toml [Developer] Enabled)",developer?"enabled":"disabled");
   const auto* messaging=F4SE::GetMessagingInterface();
   const auto* serialization=F4SE::GetSerializationInterface();
   if(!serialization || !messaging || !messaging->RegisterListener(onMessage))return false;

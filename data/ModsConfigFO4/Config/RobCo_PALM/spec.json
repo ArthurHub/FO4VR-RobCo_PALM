@@ -18,6 +18,23 @@
       "html": true
     },
     {
+      "type": "button",
+      "text": "Open the wheel",
+      "help": "Minimizes this menu and opens the wheel in front of you, to try your controls and pointer aim. Select by clicking; this menu comes back when the wheel closes.",
+      "buttonText": "Open",
+      "icon": "window",
+      "action": { "type": "CallNativeFunction", "function": "openWheel" }
+    },
+    {
+      "type": "button",
+      "text": "Wheel items and sections",
+      "help": "Minimizes this menu and opens PALM's Wheel items and Wheel settings in RPS UI's settings menu, in front of you. This menu comes back when that one closes.",
+      "buttonText": "Open",
+      "icon": "gear",
+      "action": { "type": "CallNativeFunction", "function": "openSettings" }
+    },
+    { "type": "spacer" },
+    {
       "type": "section",
       "text": "About",
       "content": [
@@ -84,9 +101,8 @@
           "type": "switcher",
           "valueType": "bool",
           "text": "Developer section",
-          "help": "Adds the Developer section to the wheel.",
+          "help": "Adds the Developer section to the wheel, which lists the actions mods add to it. A mod that adds its actions only at startup, as ROCK does, shows them after a restart.",
           "default": false,
-          "applies": "restart",
           "storage": { "path": ["Developer", "Enabled"] }
         }
       ]

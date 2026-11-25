@@ -336,9 +336,9 @@ int main(){try {
  // Another editor's Save, as Mods Config's, is read again while PALM runs.
  (void)takePointerAimChange();
  check(snapshotLogLevel()==2,"the default log level is not info");
- write(path,"[Controls]\nInputMode = 3\nMode = \"hold\"\nOpenMenu = { hand = \"left\", type = \"hold\", button = \"grip\", duration = 0.5 }\n[Pointer]\nLeftPitchDegrees = -12.5\nRightYawDegrees = 4.0\n[Logging]\nLogLevel = 4\n");
+ write(path,"[Controls]\nInputMode = 3\nMode = \"hold\"\nOpenMenu = { hand = \"left\", type = \"hold\", button = \"grip\", duration = 0.5 }\n[Pointer]\nLeftPitchDegrees = -12.5\nRightYawDegrees = 4.0\n[Logging]\nLogLevel = 4\n[Developer]\nEnabled = true\n");
  check(reloadControls().empty(),"a valid PALM.toml reported problems on reload");
- check(snapshotLogLevel()==4,"a reload did not read the log level");
+ check(snapshotLogLevel()==4 && snapshotDeveloperEnabled(),"a reload did not read the log level and the Developer switch");
  {
   InputMode reloadedMode{};const auto reloaded=snapshotControls(&reloadedMode);
   check(reloadedMode==InputMode::Custom && reloaded.mode==OpenMode::Hold && reloaded.binding.hand==Hand::Left && reloaded.binding.type==ActivationType::HoldDown,"a reload did not apply the saved controls");

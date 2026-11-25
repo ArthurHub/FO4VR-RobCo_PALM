@@ -62,10 +62,13 @@ void uninstallSettingsPages() {
  if(s.api)for(auto& page:s.pages)if(page){(void)s.api->unregisterPage(s.owner,page);page=0;}
  s.api=nullptr;s.owner=0;
 }
-bool openSettingsMenu(const rpsui::api::framework::PanelPose& pose) {
+/**
+ * Game thread: opens the menu at pose, where the wheel was, or in front of the headset without one.
+ */
+bool openSettingsMenu(const rpsui::api::framework::PanelPose* pose) {
  auto& s=state();std::scoped_lock lock(s.mutex);
  if(!s.api)return false;
- menu::OpenRequest request;request.pose=pose;request.hasPose=1;
+ menu::OpenRequest request;if(pose){request.pose=*pose;request.hasPose=1;}
  const auto result=s.api->open(s.owner,&request);
  if(result!=rpsui::api::Result::Ok)spdlog::warn("PALM Config: the settings menu did not open ({})",static_cast<unsigned>(result));
  return result==rpsui::api::Result::Ok;

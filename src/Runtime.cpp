@@ -17,6 +17,7 @@
 #include "RockInputPolicy.h"
 #include "RockFrame.h"
 #include "SettingsMenu.h"
+#include "ModsConfigClient.h"
 #include <RE/Bethesda/SendPapyrusEvent.h>
 
 namespace wheel {
@@ -71,7 +72,15 @@ struct RuntimeState {
  Gestures handGestures;
  bool leftHanded{};
  std::uint32_t world{},skeleton{},provider{};
+ // Mods Config's Open the wheel: the request's steady-clock seconds, 0 for none. The input callback opens the wheel
+ // click-to-select (requestedOpen). After that wheel or Mods Config's Open settings, the input callback shows Mods
+ // Config again once the wheel and Config have stayed closed for kRestoreDelay (restoreModsConfig, closedSince).
+ std::atomic<double> openRequestedAt{0.};
+ bool requestedOpen{};
+ std::atomic_bool restoreModsConfig{false};
+ double closedSince{};
 };
+constexpr double kOpenRequestLifetime=2.,kRestoreDelay=.3;
 RuntimeState& state(){static RuntimeState s;return s;}
 template<class Log> void queueInputLog(Log log) noexcept {
  // Use the existing game-task path and capture only values. Diagnostics must
@@ -224,6 +233,18 @@ void serviceEquipCommand() {
  refreshWheelInventory();
 }
 
+double steadySeconds(){return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();}
+/**
+ * Shows Mods Config again after a wheel its button opened: once the wheel, its pending choice and Config have all
+ * stayed closed for kRestoreDelay, so Config chosen on that wheel keeps Mods Config minimized until Config closes.
+ */
+void serviceModsConfigRestore(double now) {
+ auto& s=state();if(!s.restoreModsConfig.load())return;
+ if(s.gesture.open || s.open.load() || s.choice.load() || settingsMenuOpen() || !std::isfinite(now)){s.closedSince=0.;return;}
+ if(s.closedSince<=0.){s.closedSince=now;return;}
+ if(now-s.closedSince<kRestoreDelay)return;
+ s.restoreModsConfig=false;s.closedSince=0.;mods_config_client::restoreMenu();
+}
 std::optional<rpsui::api::framework::PanelPose> poseFor(const rpsui::api::input::Frame& frame) {
  const auto& t=frame.hands[physicalHand(state().controls.binding.hand,frame.leftHanded)];
  if(!t.valid)return {};
@@ -287,7 +308,7 @@ void submitChoice(const wheel::RockFrame& frame) {
  if(!choice || ticket!=s.generation.load())return;
  if(choice==kConfigChoice) {
   s.handGestures.clear(s.owner);
-  (void)openSettingsMenu(s.wheelPose);
+  (void)openSettingsMenu(&s.wheelPose);
   spdlog::info("Selected Config; replacing wheel at its anchor");
  }else if(choice==kSectionChoice) {
   s.handGestures.clear(s.owner);
@@ -404,7 +425,7 @@ void openHeldWheel(const rpsui::api::input::Frame& frame) {
  std::uint64_t ticket;
  {std::scoped_lock lock(s.presentationMutex);
   s.wheelPose=*pose;ticket=++s.generation;s.selection.begin(ticket);}
- tasks->AddTask([p=*pose,ticket,holdToSelect=s.controls.mode==OpenMode::Hold] {
+ tasks->AddTask([p=*pose,ticket,holdToSelect=!s.requestedOpen && s.controls.mode==OpenMode::Hold] {
   auto& s=state();
   if(!s.sessionReady.load() || !s.inputReady.load() || !s.held.load() || s.generation.load()!=ticket)return;
   try {
@@ -454,6 +475,7 @@ void selectWheel(bool closeAfterSelect,const std::optional<Action>& clicked) {
 void RPSUI_CALL onFrame(const rpsui::api::input::Frame* frame,void*) noexcept {
  try {
   if(!frame)return;auto& s=state();
+  serviceModsConfigRestore(frame->seconds);
   if(takePointerAimChange() && !publishPointerAim())spdlog::error("PALM pointer aim update rejected by UI framework");
   if(takeControlsSaveRequest())if(const auto* tasks=F4SE::GetTaskInterface())tasks->AddTask([]{persistControls();});
   InputMode inputMode;
@@ -558,7 +580,17 @@ void RPSUI_CALL onFrame(const rpsui::api::input::Frame* frame,void*) noexcept {
   std::optional<Action> clicked;
   {std::scoped_lock lock(s.presentationMutex);if(s.clickRequested.exchange(false))clicked=s.clickSelection;}
   const auto before=s.gesture;
-  const auto edge=s.gesture.update(valid && (eligible || s.gesture.open || s.gesture.draining),s.controls,allDown,anyDown,clicked.has_value() && eligible,frame->seconds,openingAllowed,rockyOwnsInput);
+  // A wheel Mods Config's button opened selects by click, whatever the binding's mode.
+  if(!s.gesture.open)s.requestedOpen=false;
+  auto gestureControls=s.controls;if(s.requestedOpen)gestureControls.mode=OpenMode::Press;
+  auto edge=s.gesture.update(valid && (eligible || s.gesture.open || s.gesture.draining),gestureControls,allDown,anyDown,clicked.has_value() && eligible,frame->seconds,openingAllowed,rockyOwnsInput);
+  if(const double requestedAt=s.openRequestedAt.load();requestedAt>0.) {
+   if(!std::isfinite(frame->seconds) || frame->seconds-requestedAt>kOpenRequestLifetime) {
+    s.openRequestedAt=0.;spdlog::info("PALM: Mods Config's Open the wheel expired before the wheel could open");
+   }else if(!s.gesture.open && edge==ControlEdge::None && eligible && valid && !rockyOwnsInput) {
+    s.openRequestedAt=0.;s.requestedOpen=true;s.restoreModsConfig=true;s.closedSince=0.;edge=s.gesture.activate();
+   }
+  }
   // At most two reports per second, only while an opening attempt is active.
   // Repeated held samples also expose a gesture continually reset by a guard.
   if(!before.open && (anyDown || before.pending || edge==ControlEdge::Open) &&
@@ -606,7 +638,7 @@ void RPSUI_CALL onFrame(const rpsui::api::input::Frame* frame,void*) noexcept {
   publishGestureState();
   submitChoice(s.rockFrame);
   if(edge==ControlEdge::Open)openHeldWheel(*frame);
-  else if(edge==ControlEdge::Select)selectWheel(s.controls.mode==OpenMode::Hold,clicked);
+  else if(edge==ControlEdge::Select)selectWheel(gestureControls.mode==OpenMode::Hold,clicked);
  }catch(...){
   spdlog::error("PALM input failed; input released until the next load");
   state().presentationFailed=true;state().inputReady=false;
@@ -624,6 +656,20 @@ void publishWheelSelection(std::uint64_t ticket,const Action& hover) {
  if(s.open.load() && s.generation.load()==ticket)(void)s.selection.publish(ticket,hover);
 }
 
+/**
+ * Asks the input callback to open the wheel at the binding's hand, click-to-select, within kOpenRequestLifetime: Mods
+ * Config's Open the wheel, which minimizes the menu so RPS UI's input comes back. False outside a loaded game.
+ */
+bool requestWheelOpen() {
+ auto& s=state();
+ if(!s.sessionReady.load() || s.presentationFailed.load())return false;
+ s.openRequestedAt=steadySeconds();return true;
+}
+/**
+ * Mods Config's Open settings opened RPS UI's settings menu with Mods Config minimized: the input callback shows Mods
+ * Config again once that menu, and any wheel opened meanwhile, have stayed closed for kRestoreDelay.
+ */
+void restoreModsConfigAfterSettings(){state().restoreModsConfig=true;}
 void requestWheelClick(std::uint64_t ticket,const Action& action) {
  auto& s=state();std::scoped_lock lock(s.presentationMutex);
  if(s.open.load() && s.generation.load()==ticket && !s.clickRequested.load()) {
