@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 4.2)
 set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "")
-project(RobCoPALM VERSION 2.0.2 LANGUAGES CXX RC)
+project(RobCoPALM VERSION 2.1.0 LANGUAGES CXX RC)
 get_filename_component(WORKSPACE "${CMAKE_CURRENT_SOURCE_DIR}/../../PROJECT_ROCK_V2" ABSOLUTE)
 # PALM's own provider API: self-contained headers PALM compiles against.
 set(PALM_PUBLIC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -26,6 +26,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 add_subdirectory("${COMMON_LIB_F4VR_PATH}" CommonLibF4 EXCLUDE_FROM_ALL)
 find_package(spdlog CONFIG REQUIRED)
 find_package(RPSFramework CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 set(IMGUI "${WORKSPACE}/../devtools/imgui")
 # RPS UI owns the in-game panels' ImGui contexts and renders them. PALM's copy
 # of Dear ImGui only issues calls into those contexts, so it is built with RPS
@@ -48,7 +49,13 @@ target_link_libraries(wheel_imgui_dx11 PUBLIC wheel_imgui d3d11 dxgi d3dcompiler
 add_library(wheel_view STATIC src/WheelView.cpp src/PalmTheme.cpp src/Fonts.cpp src/WheelConfig.cpp src/IconAtlas.cpp src/SectionRegistry.cpp src/DeveloperActions.cpp src/PalmControls.cpp external/F4VR-Input/InputBindingParser.cpp)
 target_include_directories(wheel_view PUBLIC src external/F4VR-Input
  "${WORKSPACE}/libraries_and_tools/F4VR-CommonFramework/external/openvr")
-target_link_libraries(wheel_view PUBLIC wheel_imgui RPS::Settings windowscodecs ole32)
+# The binding parser reads CommonFramework's binding tables with toml++. Its
+# implementation is the one RPS::Settings compiles once (TomlImpl.cpp), so
+# PALM includes the declarations only and links no second copy.
+find_path(TOMLPLUSPLUS_INCLUDE_DIR toml++/toml.hpp REQUIRED)
+target_include_directories(wheel_view PUBLIC "${TOMLPLUSPLUS_INCLUDE_DIR}")
+target_compile_definitions(wheel_view PUBLIC TOML_HEADER_ONLY=0)
+target_link_libraries(wheel_view PUBLIC wheel_imgui RPS::Settings nlohmann_json::nlohmann_json windowscodecs ole32)
 # The desktop preview, the capture tool and wheel tests draw PALM's pages without the game.
 add_library(palm_preview INTERFACE)
 target_include_directories(palm_preview INTERFACE src/tools "${ROCK_INCLUDE_DIR}")
@@ -56,13 +63,16 @@ target_compile_definitions(palm_preview INTERFACE WHEEL_DESKTOP_PREVIEW)
 target_link_libraries(palm_preview INTERFACE wheel_view)
 configure_file(cmake/version.rc.in version.rc @ONLY)
 add_library(RobCoPALM SHARED src/Plugin.cpp src/Runtime.cpp src/RockServices.cpp src/Gestures.cpp src/Inventory.cpp src/Equipment.cpp src/Renderer.cpp src/MenuApi.cpp src/RequiredUpdates.cpp
- src/SettingsMenu.cpp src/exports.def src/IconResources.rc "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
+ src/SettingsMenu.cpp src/ModsConfigClient.cpp src/exports.def src/IconResources.rc "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
 set_target_properties(RobCoPALM PROPERTIES OUTPUT_NAME wheelmenu)
 set_source_files_properties(src/Gestures.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties(src/MenuApi.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 target_include_directories(RobCoPALM PRIVATE src
  "${ROCK_INCLUDE_DIR}"
- "${RPSUI_INCLUDE_DIR}")
+ "${RPSUI_INCLUDE_DIR}"
+ # Mods Config FO4 VR's client header, copied as is.
+ external/ModsConfigFO4)
+target_compile_definitions(RobCoPALM PRIVATE PALM_VERSION="${PROJECT_VERSION}")
 target_link_libraries(RobCoPALM PRIVATE CommonLibF4::CommonLibF4 spdlog::spdlog wheel_view shell32 version bcrypt)
 target_precompile_headers(RobCoPALM PRIVATE src/PCH.h)
 target_compile_options(RobCoPALM PRIVATE /MP /Zi /wd4715 /utf-8)
@@ -76,7 +86,9 @@ if(NOT COPY_PLUGIN_BASE_PATH STREQUAL "")
  add_custom_command(TARGET RobCoPALM POST_BUILD
  COMMAND ${CMAKE_COMMAND} -E make_directory "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins"
  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:RobCoPALM>" "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins/"
- COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_PDB_FILE:RobCoPALM>" "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins/")
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_PDB_FILE:RobCoPALM>" "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins/"
+ # PALM's page in Mods Config FO4 VR.
+ COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CMAKE_CURRENT_SOURCE_DIR}/data" "${COPY_PLUGIN_BASE_PATH}")
 endif()
 enable_testing()
 add_executable(PALMDeveloperActionsTests tests/DeveloperActionsTests.cpp src/DeveloperActions.cpp src/SectionRegistry.cpp)
@@ -138,6 +150,10 @@ add_executable(PalmControlsTests tests/PalmControlsTests.cpp preview/PreviewFont
 target_link_libraries(PalmControlsTests PRIVATE palm_preview)
 target_compile_definitions(PalmControlsTests PRIVATE PALM_CONTROLS_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/palm-controls-test")
 add_test(NAME Wheel.Controls COMMAND PalmControlsTests)
+
+add_executable(WheelPagesTests tests/WheelPagesTests.cpp preview/PreviewFonts.cpp)
+target_link_libraries(WheelPagesTests PRIVATE palm_preview)
+add_test(NAME Wheel.ModsConfigPages COMMAND WheelPagesTests)
 
 add_executable(PALMCapture preview/Capture.cpp preview/PreviewFonts.cpp src/IconResources.rc)
 target_link_libraries(PALMCapture PRIVATE palm_preview wheel_imgui_dx11 windowscodecs ole32)

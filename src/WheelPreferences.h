@@ -13,9 +13,10 @@ struct Favorite {std::string key,name;unsigned slot{};};
 struct Preferences {
  std::array<bool,kCategoryCount> enabled{true,true,true,true,true};
  bool gesturesEnabled{false}; // Hand gestures are opt-in from PALM's settings.
+ bool configShown{true}; // Config's entry on the ring; PALM's settings stay in Mods Config without it.
  std::vector<std::string> sections;
  std::array<std::vector<Favorite>,kCategoryCount> slots;
- unsigned enabledEntries() const {return 1+static_cast<unsigned>(std::count(enabled.begin(),enabled.end(),true))+(gesturesEnabled?2:0)+static_cast<unsigned>(sections.size());}
+ unsigned enabledEntries() const {return (configShown?1u:0u)+static_cast<unsigned>(std::count(enabled.begin(),enabled.end(),true))+(gesturesEnabled?2:0)+static_cast<unsigned>(sections.size());}
  bool sectionEnabled(std::string_view id) const {return std::find(sections.begin(),sections.end(),id)!=sections.end();}
  bool setSectionEnabled(std::string_view id,bool value,unsigned visibleCount=~0u) {
   if(visibleCount==~0u)visibleCount=enabledEntries();
@@ -57,6 +58,7 @@ inline std::string stableItemKey(std::string plugin,std::uint32_t form) {
 }
 inline Model curatedInventory(const Model& inventory,const Preferences& prefs) {
  Model result;result.category=inventory.category;result.status=inventory.status;result.enabled=prefs.enabled;result.gesturesEnabled=prefs.gesturesEnabled;
+ result.configShown=prefs.configShown;
  result.equipmentNamesAvailable=inventory.equipmentNamesAvailable;
  for(unsigned c=0;c<kCategoryCount;++c)for(unsigned slot=0;slot<kSlots;++slot)
   if(prefs.slotFree(c,slot))result.freeSlots[c]|=static_cast<std::uint8_t>(1u<<slot);
@@ -81,6 +83,8 @@ inline Model curatedInventory(const Model& inventory,const Preferences& prefs) {
 inline void writePreferences(std::ostream& out,const Preferences& prefs) {
  out<<"PALMItems 2\n";
  out<<"gestures "<<prefs.gesturesEnabled<<'\n';
+ // Only a hidden Config is written, so a wheel that shows it reads in a PALM that has no config line.
+ if(!prefs.configShown)out<<"config 0\n";
  for(const auto& section:prefs.sections)out<<"section "<<std::quoted(section)<<'\n';
  for(unsigned c=0;c<kCategoryCount;++c) {
   out<<"category "<<c<<' '<<prefs.enabled[c]<<'\n';
@@ -89,16 +93,16 @@ inline void writePreferences(std::ostream& out,const Preferences& prefs) {
 }
 // Version 2 records each choice's ring slot. Version 1 (saves made before
 // fixed slots) is read with its choices in their saved order, so existing
-// wheels keep their items; it is never written.
+// wheels keep their items; it is never written. Without a config line Config is shown.
 inline bool readPreferences(std::istream& in,Preferences& prefs) {
  Preferences parsed;std::string line;
  if(!std::getline(in,line))return false;
  if(!line.empty() && line.back()=='\r')line.pop_back();
  if(line!="PALMItems 1" && line!="PALMItems 2")return false;
  const bool positional=line=="PALMItems 2";
- std::array<bool,kCategoryCount> categories{};unsigned lines=0;bool gesturesRead=false;
+ std::array<bool,kCategoryCount> categories{};unsigned lines=0;bool gesturesRead=false,configRead=false;
  while(std::getline(in,line)) {
-  if(++lines>kCategoryCount*(kSlots+1)+palm::api::menu::kMaxSections+1 || line.size()>2048)return false;
+  if(++lines>kCategoryCount*(kSlots+1)+palm::api::menu::kMaxSections+2 || line.size()>2048)return false;
   std::istringstream row(line);std::string kind;unsigned c;
   if(!(row>>kind))return false;
   if(kind=="section") {
@@ -110,6 +114,9 @@ inline bool readPreferences(std::istream& in,Preferences& prefs) {
   if(kind=="gestures") {
    if(gesturesRead || c>1)return false;
    gesturesRead=true;parsed.gesturesEnabled=c!=0;
+  }else if(kind=="config") {
+   if(configRead || c>1)return false;
+   configRead=true;parsed.configShown=c!=0;
   }else if(kind=="category") {int enabled;if(categories[c] || !(row>>enabled) || enabled<0 || enabled>1)return false;
    categories[c]=true;parsed.enabled[c]=enabled!=0;
   }else if(kind=="item") {Favorite f;unsigned slot{};

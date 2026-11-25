@@ -4,6 +4,7 @@
 #include "WheelSaveRecord.h"
 #include "DeveloperActions.h"
 #include "PalmControls.h"
+#include "ModsConfigClient.h"
 #include <ShlObj.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 
@@ -30,6 +31,7 @@ void F4SEAPI onLoad(const F4SE::SerializationInterface* stream) noexcept {
 void onMessage(F4SE::MessagingInterface::Message* message) noexcept {
  try {
   if(!message)return;
+  if(message->type==F4SE::MessagingInterface::kPostLoad) {wheel::mods_config_client::connect();return;}
   // PreLoad also runs when no co-save exists and F4SE never invokes onLoad.
   if(message->type==F4SE::MessagingInterface::kPreLoadGame) {wheel::beginGameLoad();return;}
   if(message->type==F4SE::MessagingInterface::kNewGame) {
@@ -74,10 +76,11 @@ extern "C" __declspec(dllexport) bool F4SEAPI F4SEPlugin_Load(const F4SE::LoadIn
     for(const auto& notice:settings->notices())spdlog::info("{}",notice);
     for(const auto& message:settings->messages())spdlog::warn("{}",message);
     developer=settings->find("Developer","Enabled")->value=="true";
+    spdlog::set_level(static_cast<spdlog::level::level_enum>(wheel::logLevel(*settings)));
    }catch(const std::exception& error){spdlog::error("PALM settings unavailable: {}",error.what());}
   }
   if(!wheel::developerActions().initialize(developer))spdlog::error("PALM Developer section unavailable; existing mod sections preserved");
-  spdlog::info("PALM Developer wheel {} (PALM.toml [Developer] Enabled; restart required)",developer?"enabled":"disabled");
+  spdlog::info("PALM Developer wheel {} (PALM.toml [Developer] Enabled)",developer?"enabled":"disabled");
   const auto* messaging=F4SE::GetMessagingInterface();
   const auto* serialization=F4SE::GetSerializationInterface();
   if(!serialization || !messaging || !messaging->RegisterListener(onMessage))return false;

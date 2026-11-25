@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.1.0
+
+### Requirements
+
+- Mods Config FO4 VR is needed for PALM's settings page. Without it PALM runs, and
+  its settings are edited in `PALM.toml`.
+
+### Added
+
+- RobCo PALM's page in Mods Config FO4 VR: the wheel's sections, with a page of
+  items for each part on the ring, the controls, pointer aim, log level and the
+  Developer switch. Wheel sections and items show on the wheel as you change them;
+  an Open the wheel button sets the menu aside to see them.
+- Where the wheel opens: its distance, height and side from the opening hand, and
+  its size. It turns to face the headset wherever it opens, unless you turn that off.
+- Config can be hidden from the ring, which frees a place for another section.
+- An RPS UI page edits RPS UI Framework's theme, sharpness, haptic strength and grip
+  to move.
+- A log level for `RobCoPALM.log`.
+
+### Changed
+
+- **Config** opens RobCo PALM's page in Mods Config FO4 VR. RPS UI settings
+  (legacy), in the page's Help section, still opens RPS UI's menu with the Wheel
+  items and Wheel settings pages, the Spawner and the Console.
+- Controls and pointer aim are edited only in Mods Config FO4 VR; RPS UI's Wheel
+  settings page keeps the wheel's sections.
+- `OpenMenu` in `PALM.toml` is a binding table, such as
+  `{ hand = "right", type = "release", button = "thumbstick" }`; a one-line binding
+  becomes that table at the first start.
+- The Developer switch applies when you save, without a restart. A mod that adds
+  its Developer actions only at startup, as ROCK does, shows them after a restart.
+- New pointer aim defaults: pitch 25° on both hands, yaw 15° left and -18° right.
+  A `PALM.toml` that has its own angles keeps them.
+
 ## 2.0.2
 
 ### Requirements

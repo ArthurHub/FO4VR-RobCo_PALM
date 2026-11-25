@@ -5,14 +5,28 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <string>
+#include <vector>
 #include <RPS/Settings/Store.h>
 
 namespace wheel {
 enum class OpenMode { Hold, Press };
 enum class InputMode { StickClick=1, GripTriggerHold=2, Custom=3 };
+// [Wheel] Size's range. The wheel's panel is registered with RPS UI for it, and RPS UI refuses an open outside it.
+inline constexpr float kWheelMinimumSize=60.f,kWheelMaximumSize=150.f;
+// Where the wheel opens, in game units from the opening hand: its center ahead, above and to the right of it (side,
+// negative to the left, as the player faces), and its width and height. faceHeadset turns it to face the headset;
+// without it, it faces back along the opening hand's direction.
+struct WheelPlacement {
+ float distance{85.f},height{9.f},size{95.f},side{0.f};
+ bool faceHeadset{true};
+ bool operator==(const WheelPlacement&) const=default;
+};
+// Left, right. The defaults are the aim tested in game: both pointers raised 25 degrees, each turned in toward the middle.
 struct PointerAim {
- std::array<float,2> pitch{},yaw{};
+ std::array<float,2> pitch{25.f,25.f},yaw{15.f,-18.f};
  bool operator==(const PointerAim&) const=default;
 };
 // User pitch is relative to the tested forward aim, not the native wand axis.
@@ -125,21 +139,19 @@ bool parseControls(std::string_view mode,std::string_view binding,Controls& out,
 std::string bindingText(const Controls& controls);
 Controls snapshotControls(InputMode* inputMode=nullptr);
 InputMode snapshotInputMode();
-bool applyInputMode(InputMode mode);
 // PALM.toml at path through RPS Framework's settings store, loaded at startup:
 // organized, created when missing, and PALM.ini beside it migrated once.
 std::unique_ptr<RPS::Settings::Store> openPalmSettings(const std::filesystem::path& path);
-// Loads controls and pointer aim from PALM.toml at path; an empty path keeps
-// them in memory only (the desktop preview).
-void initializeControls(const std::filesystem::path& path);
-bool applyControls(const Controls& controls,bool queueSave=true); // Memory only; explicit save is queued for the game task.
-bool takeControlsSaveRequest();
-void persistControls();
-void drawControls();
+std::vector<std::string> initializeControls(const std::filesystem::path& path);
+std::vector<std::string> reloadControls();
+int logLevel(const RPS::Settings::Store& store);
+int snapshotLogLevel();
+bool snapshotDeveloperEnabled();
 PointerAim snapshotPointerAim();
-bool applyPointerAim(const PointerAim& aim,bool commit=true);
+WheelPlacement snapshotWheelPlacement();
+bool previewWheelPlacement(std::string_view key,std::optional<float> value);
+void previewWheelFacing(std::optional<bool> faceHeadset);
 bool takePointerAimChange();
-void drawPointerAim();
 void setGestureIntegrationAvailable(bool available);
 bool gestureIntegrationAvailable();
 }

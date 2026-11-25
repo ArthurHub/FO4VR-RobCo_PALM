@@ -2,6 +2,8 @@
 #include "RockInputPolicy.h"
 #include <iostream>
 #include <fstream>
+#include <iterator>
+#include <string>
 #include <stdexcept>
 #include <Windows.h>
 #include <limits>
@@ -217,7 +219,7 @@ int main(){try {
  gesture={};plainClick(0,0,0,{true,false});plainClick(0,stick,1,{true,false});
  check(plainClick(0,0,1.01,{true,false})==ControlEdge::Open,"unbound hand's holster blocked right click");
  std::string legacyError;
- check(parseControls("hold","right hold trigger 0.25 suppress +grip",controls,legacyError),"explicit hold binding rejected");
+ check(parseControls("hold",R"({ hand = "right", type = "hold", button = "trigger", duration = 0.25, modifier = { button = "grip" } })",controls,legacyError),"explicit hold binding rejected");
  gesture={};
  const auto update=[&](bool all,bool any,double time,bool click=false,bool usable=true){return gesture.update(usable,controls,all,any,click,time);};
  check(update(true,true,0)==ControlEdge::None,"a held binding opened across a context change");
@@ -238,16 +240,23 @@ int main(){try {
  update(false,false,7);update(true,true,8);update(true,true,8.1,false,false);
  check(!gesture.ownsInput(),"context loss retained capture");
  std::string error;Controls parsed;
- check(parseControls("press","offhand press a +primary:grip",parsed,error),"framework chord syntax rejected");
+ check(parseControls("press",R"({ hand = "offhand", type = "press", button = "a", modifier = { hand = "primary", button = "grip" } })",parsed,error),"framework chord table rejected");
  auto masks=controlMasks(parsed,false);check(masks.buttons[0]==(1ull<<7) && masks.buttons[1]==(1ull<<2),"cross-hand binding mapped incorrectly");
  masks=controlMasks(parsed,true);check(masks.buttons[1]==(1ull<<7) && masks.buttons[0]==(1ull<<2),"left-handed mode did not swap logical hands");
- check(parseControls("hold","right press trigger",parsed,error) && parsed.mode==OpenMode::Hold,"opening gesture was coupled to selection mode");
- check(!parseControls("hold","right hold trigger nan",parsed,error),"nonfinite hold accepted");
- check(!parseControls("hold","right hold trigger +trigger",parsed,error),"duplicate chord members accepted");
- check(!parseControls("press","none",parsed,error),"inaccessible opening binding accepted");
- check(!parseControls("press","right touch trigger",parsed,error),"touch binding accepted");
- check(!parseControls("press","right thumbstick up",parsed,error),"axis binding accepted");
- for(const auto text:{"left press grip","right tap a +grip","left double b 0.4 +right:trigger","primary hold trigger 0.25 +grip","offhand longpress a 0.6","left release grip"}) {
+ check(parseControls("hold",R"({ hand = "right", type = "press", button = "trigger" })",parsed,error) && parsed.mode==OpenMode::Hold,"opening gesture was coupled to selection mode");
+ check(!parseControls("hold",R"({ hand = "right", type = "hold", button = "trigger", duration = nan })",parsed,error),"nonfinite hold accepted");
+ check(!parseControls("hold",R"({ hand = "right", type = "hold", button = "trigger", modifier = { button = "trigger" } })",parsed,error),"duplicate chord members accepted");
+ check(!parseControls("press",R"({ type = "none" })",parsed,error),"inaccessible opening binding accepted");
+ check(!parseControls("press",R"({ hand = "right", type = "touch", button = "trigger" })",parsed,error),"touch binding accepted");
+ check(!parseControls("press",R"({ hand = "right", type = "axis", axis = "thumbstick", direction = "up" })",parsed,error),"axis binding accepted");
+ check(!parseControls("press",R"({ hand = "any", type = "press", button = "grip" })",parsed,error),"a binding of either hand accepted");
+ check(!parseControls("press",R"({ hand = "right", type = "press", button = "grip", modifier = { hand = "any", button = "a" } })",parsed,error),"a modifier of either hand accepted");
+ check(!parseControls("press","right press grip",parsed,error),"the old one-line binding read as a table");
+ check(!parseControls("press","{ hand = \"right\", type = \"press\", button = \"grip\" }\nother = 1",parsed,error),"text past the table accepted");
+ for(const auto text:{R"({ hand = "left", type = "press", button = "grip" })",R"({ hand = "right", type = "tap", button = "a", modifier = { button = "grip" } })",
+  R"({ hand = "left", type = "double", button = "b", duration = 0.4, modifier = { hand = "right", button = "trigger" } })",
+  R"({ hand = "primary", type = "hold", button = "trigger", duration = 0.25, modifier = { button = "grip" } })",
+  R"({ hand = "offhand", type = "longpress", button = "a", duration = 0.6 })",R"({ hand = "left", type = "release", button = "grip" })"}) {
   check(parseControls("hold",text,parsed,error),"button binding type rejected");
   Controls roundtrip;check(parseControls(parsed.mode==OpenMode::Hold?"hold":"press",bindingText(parsed),roundtrip,error) && roundtrip==parsed,"binding type did not roundtrip");
  }
@@ -270,7 +279,8 @@ int main(){try {
  check(update(false,false,4)==ControlEdge::Open,"release binding failed after a long hold");
  controls.binding.duration=.2f;gesture={};update(false,false,0);update(true,true,1);
  check(update(false,false,1.3)==ControlEdge::None,"release binding ignored its maximum hold");
- check(parseControls("hold","left tap b +grip",parsed,error) && parsed.mode==OpenMode::Press,"tap offered impossible release-to-select");
+ check(parseControls("hold",R"({ hand = "left", type = "tap", button = "b", modifier = { button = "grip" } })",parsed,error) && parsed.mode==OpenMode::Press,"tap offered impossible release-to-select");
+ check(bindingText(Controls{})==R"({ hand = "right", type = "release", button = "thumbstick" })","default binding is not the table a person writes");
  check(parseControls("press",bindingText(Controls{}),parsed,error) && parsed==Controls{},"default binding did not roundtrip");
  // Fixtures stay with the test build, never in the system temporary directory.
  const std::filesystem::path directory(PALM_CONTROLS_TEST_DIR);
@@ -278,42 +288,84 @@ int main(){try {
  struct Cleanup{std::filesystem::path path;~Cleanup(){initializeControls({});std::error_code error;std::filesystem::remove_all(path,error);}} cleanup{directory};
  const auto path=directory/"PALM.toml",ini=directory/"PALM.ini";
  const auto write=[](const std::filesystem::path& file,const char* text){std::ofstream(file,std::ios::binary)<<text;};
+ const auto read=[](const std::filesystem::path& file){std::ifstream in(file,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};
  // An INI from before input modes keeps its remapped binding as Custom, and goes.
  write(ini,"[Other]\nuntouched=hello\n[Controls]\nsMode=press\nsOpenMenu=left press b +grip\n");
  initializeControls(path);const auto loaded=snapshotControls();check(loaded.mode==OpenMode::Press && loaded.binding.hand==Hand::Left,"PALM did not migrate its INI");
  check(!std::filesystem::exists(ini) && std::filesystem::exists(path),"PALM.ini was not replaced by PALM.toml");
  check(snapshotInputMode()==InputMode::Custom,"legacy remapping was not retained as Custom");
+ check(read(path).find(R"(OpenMenu = { hand = "left", type = "press", button = "menu", modifier = { button = "grip" } })")!=std::string::npos,"PALM.ini's binding did not become a table");
+ // A preset is the binding while it is chosen; Custom's binding stays in the file for when Custom is chosen again.
+ const auto customLine="[Controls]\nMode = \"press\"\nOpenMenu = "+bindingText(loaded)+"\n";
  for(const auto mode:{InputMode::StickClick,InputMode::GripTriggerHold}) {
-  check(applyInputMode(mode) && snapshotControls()==controlsForMode(mode),"fixed input mode used custom binding");
-  check(!applyControls(loaded),"preset permitted remapping outside Custom");
-  persistControls();initializeControls(path);
-  check(snapshotInputMode()==mode && snapshotControls()==controlsForMode(mode),"selected input mode was not restored");
-  check(applyInputMode(InputMode::Custom) && snapshotControls()==loaded,"preset switching discarded custom mapping");
+  write(path,(customLine+"InputMode = "+std::to_string(static_cast<int>(mode))+"\n").c_str());
+  check(initializeControls(path).empty(),"a valid preset reported a problem");
+  check(snapshotInputMode()==mode && snapshotControls()==controlsForMode(mode),"a preset used Custom's binding");
  }
- check(!applyInputMode(static_cast<InputMode>(4)) && snapshotInputMode()==InputMode::Custom,"invalid input mode changed controls");
- check(applyControls(Controls{}) && takeControlsSaveRequest(),"edit did not queue persistence");persistControls();initializeControls(path);
- check(snapshotControls()==Controls{},"controls were not restored from disk");
+ write(path,(customLine+"InputMode = 3\n").c_str());initializeControls(path);
+ check(snapshotInputMode()==InputMode::Custom && snapshotControls()==loaded,"Custom did not use its kept binding");
+ write(path,"[Controls]\nInputMode = 3\n");initializeControls(path);
+ check(snapshotControls()==Controls{},"Custom without a binding did not use the default binding");
  check(snapshotPointerAim()==PointerAim{},"missing pointer keys did not use default calibration");
- check(nativePointerPitch(snapshotPointerAim().pitch[0])==-70.f && nativePointerPitch(snapshotPointerAim().pitch[1])==-70.f,"zero adjustment did not apply the forward baseline to both hands");
+ check(std::fabs(nativePointerPitch(snapshotPointerAim().pitch[0])+45.f)<1e-4f && std::fabs(nativePointerPitch(snapshotPointerAim().pitch[1])+45.f)<1e-4f,"the default pitch did not apply over the forward baseline to both hands");
  check(nativePointerPitch(-90.f)==-160.f && nativePointerPitch(90.f)==20.f,"pitch correction range was clipped around the forward baseline");
  (void)takePointerAimChange();
  PointerAim aim;aim.pitch={-75,-68};aim.yaw={-2,4};
- check(applyPointerAim(aim,false) && !takePointerAimChange(),"dragging the calibration slider changed live aim before release");
- check(applyPointerAim(aim) && takePointerAimChange() && takeControlsSaveRequest(),"released calibration edit did not apply and queue its save");
- persistControls();initializeControls(path);
- check(snapshotPointerAim()==aim && snapshotControls()==Controls{},"per-hand calibration did not persist independently of bindings");
- auto invalidAim=aim;invalidAim.pitch[0]=91;
- check(!applyPointerAim(invalidAim) && snapshotPointerAim()==aim,"out-of-range calibration changed pointer settings");
- invalidAim=aim;invalidAim.yaw[1]=std::numeric_limits<float>::quiet_NaN();
- check(!applyPointerAim(invalidAim),"non-finite calibration was accepted");
- write(path,"[Pointer]\nLeftPitchDegrees = 'invalid'\nRightPitchDegrees = -68.0\n");initializeControls(path);
+ write(path,"[Controls]\nInputMode = 3\n[Pointer]\nLeftPitchDegrees = -75.0\nRightPitchDegrees = -68.0\nLeftYawDegrees = -2.0\nRightYawDegrees = 4.0\n");
+ check(initializeControls(path).empty() && takePointerAimChange(),"a saved pointer aim was not applied");
+ check(snapshotPointerAim()==aim && snapshotControls()==Controls{},"per-hand calibration did not read independently of bindings");
+ write(path,"[Pointer]\nLeftPitchDegrees = 'invalid'\nRightPitchDegrees = -68.0\n");
+ (void)initializeControls(path); // The store reports a value of another type itself, as PALM loads.
  check(snapshotPointerAim().pitch[0]==PointerAim{}.pitch[0] && snapshotPointerAim().pitch[1]==aim.pitch[1],"invalid pointer angle did not use its default independently");
- write(path,"[Pointer]\nLeftPitchDegrees = 95.0\n");initializeControls(path);
+ write(path,"[Pointer]\nLeftPitchDegrees = 95.0\n");
+ check(!initializeControls(path).empty(),"an out-of-range pointer angle was not reported");
  check(snapshotPointerAim().pitch[0]==PointerAim{}.pitch[0],"an out-of-range saved angle was used");
  std::filesystem::remove(path);initializeControls(path);
  check(snapshotInputMode()==InputMode::StickClick && snapshotControls()==Controls{} && snapshotPointerAim()==PointerAim{} && std::filesystem::exists(path),"first run did not create mode 1 and pointer defaults");
  write(path,"[Controls]\nInputMode = 99\n");initializeControls(path);
  check(snapshotInputMode()==InputMode::StickClick && snapshotControls()==Controls{},"invalid saved mode did not use default");
+ // PALM.toml's old one-line binding becomes its table once.
+ write(path,"[Controls]\nInputMode = 3\nOpenMenu = \"left press grip +trigger\"\n");initializeControls(path);
+ check(snapshotControls().binding.hand==Hand::Left && snapshotControls().binding.modifier && snapshotControls().binding.modifier->button==vr::k_EButton_SteamVR_Trigger,"the old OpenMenu line was not converted");
+ check(read(path).find(R"(OpenMenu = { hand = "left", type = "press", button = "grip", modifier = { button = "trigger" } })")!=std::string::npos,"PALM.toml's old binding did not become a table");
+ initializeControls(path);check(snapshotControls().binding.hand==Hand::Left,"the converted binding did not read back");
+ write(path,"[Controls]\nInputMode = 3\nOpenMenu = \"sideways\"\n");initializeControls(path);
+ check(snapshotControls()==Controls{},"an unreadable old OpenMenu line did not become the default");
+ // Another editor's Save, as Mods Config's, is read again while PALM runs.
+ (void)takePointerAimChange();
+ check(snapshotLogLevel()==2,"the default log level is not info");
+ write(path,"[Controls]\nInputMode = 3\nMode = \"hold\"\nOpenMenu = { hand = \"left\", type = \"hold\", button = \"grip\", duration = 0.5 }\n[Pointer]\nLeftPitchDegrees = -12.5\nRightYawDegrees = 4.0\n[Logging]\nLogLevel = 4\n[Developer]\nEnabled = true\n");
+ check(reloadControls().empty(),"a valid PALM.toml reported problems on reload");
+ check(snapshotLogLevel()==4 && snapshotDeveloperEnabled(),"a reload did not read the log level and the Developer switch");
+ {
+  InputMode reloadedMode{};const auto reloaded=snapshotControls(&reloadedMode);
+  check(reloadedMode==InputMode::Custom && reloaded.mode==OpenMode::Hold && reloaded.binding.hand==Hand::Left && reloaded.binding.type==ActivationType::HoldDown,"a reload did not apply the saved controls");
+  const auto sameAngle=[](float a,float b){return std::fabs(a-b)<1e-4f;};
+  check(sameAngle(snapshotPointerAim().pitch[0],-12.5f) && sameAngle(snapshotPointerAim().yaw[1],4.f) && takePointerAimChange(),"a reload did not apply the saved pointer aim");
+ }
+ write(path,"[Controls]\nInputMode = 3\nOpenMenu = { hand = \"sideways\" }\n[Logging]\nLogLevel = 9\n");(void)reloadControls();
+ check(snapshotControls().binding.hand==Hand::Left,"an unreadable binding replaced the controls on reload");
+ check(snapshotLogLevel()==2,"an out-of-range log level was not info");
+ // Wheel placement: PALM.toml's values, with Mods Config's live previews over them until a Save or Discard.
+ check(snapshotWheelPlacement()==WheelPlacement{},"a file without [Wheel] did not use the default placement");
+ write(path,"[Wheel]\nDistance = 70.0\nHeight = -5.0\nSize = 120.0\n");
+ check(reloadControls().empty(),"a valid [Wheel] reported a problem");
+ {
+  const auto sameValue=[](float a,float b){return std::fabs(a-b)<1e-4f;};
+  auto placement=snapshotWheelPlacement();
+  check(sameValue(placement.distance,70.f) && sameValue(placement.height,-5.f) && sameValue(placement.size,120.f),"a reload did not read the wheel's placement");
+  check(previewWheelPlacement("Distance",100.f) && sameValue(snapshotWheelPlacement().distance,100.f),"a live distance did not show over the file's");
+  check(!previewWheelPlacement("Distance",500.f) && !previewWheelPlacement("Depth",50.f),"an out-of-range or unknown placement was accepted");
+  check(previewWheelPlacement("Side",-12.f) && sameValue(snapshotWheelPlacement().side,-12.f),"a live side offset did not show");
+  check(snapshotWheelPlacement().faceHeadset,"the wheel does not face the headset by default");
+  previewWheelFacing(false);check(!snapshotWheelPlacement().faceHeadset,"a live Face the headset did not show");
+  previewWheelFacing(std::nullopt);check(snapshotWheelPlacement().faceHeadset,"a Discard did not return to the file's Face the headset");
+  check(previewWheelPlacement("Distance",std::nullopt) && sameValue(snapshotWheelPlacement().distance,70.f),"a Discard did not return to the file's distance");
+  (void)previewWheelPlacement("Size",80.f);(void)reloadControls();
+  check(sameValue(snapshotWheelPlacement().size,120.f),"a Save's read of the file did not end the live size");
+ }
+ write(path,"[Wheel]\nSize = 10.0\n");
+ check(!reloadControls().empty(),"an out-of-range wheel size was not reported");
  // An INI with a chosen preset keeps it.
  std::filesystem::remove(path);write(ini,"[Controls]\niInputMode=2\nsMode=press\nsOpenMenu=right release thumbstick suppress\n");
  initializeControls(path);check(snapshotInputMode()==InputMode::GripTriggerHold,"a migrated preset was not kept");

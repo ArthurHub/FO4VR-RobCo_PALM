@@ -1,0 +1,419 @@
+{
+  "minSchemaVersion": 1,
+  "modName": "RobCoPALM",
+  "displayName": "RobCo PALM",
+  "help": "The wheel menu: quick access to your equipment, consumables, hand gestures and mod settings.",
+  "category": "Interface",
+  "specVersion": 1,
+  "f4sePluginRequirements": ["RobCoPALM"],
+  "files": {
+    "palm": { "format": "toml", "root": "myGames", "path": "Mods_Config/RobCo_PALM/PALM.toml" },
+    "rpsui": { "format": "toml", "root": "myGames", "path": "Mods_Config/RPS_UI_Framework/RPS_UI.toml" }
+  },
+  "defaultFile": "palm",
+  "applies": "save",
+  "content": [
+    {
+      "type": "image",
+      "texture": "RobCo_PALM/banner.dds",
+      "width": 700
+    },
+    {
+      "type": "text",
+      "text": "<font color='#AAAAAA' size=13>Version: {clientState:modVersion}</font>",
+      "html": true
+    },
+    {
+      "type": "section",
+      "text": "About",
+      "content": [
+        {
+          "type": "text",
+          "text": "RobCo P.A.L.M., the Personal Access & Loadout Manager, is a wheel menu for Fallout 4 VR: up to eight items per category, hand gestures with ROCK and FRIK, and sections other mods add."
+        }
+      ]
+    },
+    { "type": "spacer" },
+    {
+      "type": "section",
+      "text": "Help",
+      "content": [
+        {
+          "type": "button",
+          "text": "RobCo PALM on GitHub",
+          "help": "Opens PALM's page in your browser. Take off the headset to read it on your monitor.",
+          "buttonText": "Open",
+          "action": { "type": "OpenURL", "url": "https://github.com/brunocatani/RobCo_PALM" }
+        },
+        {
+          "type": "button",
+          "text": "RPS UI settings (legacy)",
+          "help": "Kept for compatibility: opens RPS UI's settings menu in front of you, with PALM's earlier Wheel items and Wheel settings pages, the Spawner and the Console. This menu minimizes, and comes back when that one closes.",
+          "buttonText": "Open",
+          "icon": "gear",
+          "action": { "type": "CallNativeFunction", "function": "openSettings" }
+        },
+        { "type": "spacer" },
+        {
+          "type": "text",
+          "text": "<font color='#10FA78'>Opening the wheel:</font> click and release the right thumbstick, then point and click the pointing hand's trigger or A/X to select. Click Cancel to close. Other ways to open it are on the Controls page.",
+          "html": true
+        },
+        {
+          "type": "text",
+          "text": "<font color='#10FA78'>Choosing items:</font> the Wheel page chooses what the ring shows, and each part on it has its own page of items under it.",
+          "html": true
+        },
+        {
+          "type": "text",
+          "text": "<font color='#10FA78'>Adding what you hold:</font> hold a weapon, or a loose aid or food item, and select an empty slot on its page to add it to the wheel. Aid and food need ROCK.",
+          "html": true
+        }
+      ]
+    },
+    { "type": "spacer" },
+    {
+      "type": "section",
+      "text": "Developer",
+      "isCollapsible": true,
+      "collapsed": true,
+      "content": [
+        {
+          "type": "stepper",
+          "valueType": "int",
+          "text": "Log Level",
+          "help": "How much PALM writes to RobCoPALM.log.",
+          "default": 2,
+          "valueOptions": {
+            "options": [
+              { "value": 2, "text": "Info", "help": "The basic log, for normal play." },
+              { "value": 3, "text": "Warnings", "help": "Only warnings and errors." },
+              { "value": 4, "text": "Errors", "help": "Only errors." },
+              { "value": 6, "text": "Off", "help": "No log." }
+            ]
+          },
+          "storage": { "path": ["Logging", "LogLevel"] }
+        },
+        {
+          "type": "switcher",
+          "valueType": "bool",
+          "text": "Developer section",
+          "help": "Adds the Developer section to the wheel, which lists the actions mods add to it. A mod that adds its actions only at startup, as ROCK does, shows them after a restart.",
+          "default": false,
+          "storage": { "path": ["Developer", "Enabled"] }
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "id": "wheel",
+      "pageDisplayName": "Wheel",
+      "help": "What the ring shows, and below it the items of each part on it. Changes show on the wheel as you make them.",
+      "applies": "live",
+      "contentFromClientCallback": true,
+      "pages": [
+        {
+          "id": "items.weapons",
+          "pageDisplayName": "Weapons",
+          "help": "Up to eight weapons on the wheel. Shown while Weapons is on the ring.",
+          "visibleWhen": { "clientState": "section.weapons", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.armor",
+          "pageDisplayName": "Armor",
+          "help": "Up to eight armor on the wheel. Shown while Armor is on the ring.",
+          "visibleWhen": { "clientState": "section.armor", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.aid",
+          "pageDisplayName": "Aid",
+          "help": "Up to eight aid items on the wheel. Shown while Aid is on the ring.",
+          "visibleWhen": { "clientState": "section.aid", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.food",
+          "pageDisplayName": "Food",
+          "help": "Up to eight food items on the wheel. Shown while Food is on the ring.",
+          "visibleWhen": { "clientState": "section.food", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.grenades",
+          "pageDisplayName": "Grenades",
+          "help": "Up to eight grenades on the wheel. Shown while Grenades is on the ring.",
+          "visibleWhen": { "clientState": "section.grenades", "equals": true },
+          "contentFromClientCallback": true
+        }
+      ]
+    },
+    {
+      "id": "controls",
+      "pageDisplayName": "Controls",
+      "help": "How the wheel opens, how you select on it, and where each controller points.",
+      "content": [
+        {
+          "id": "inputMode",
+          "type": "dropdown",
+          "valueType": "int",
+          "text": "Input mode",
+          "help": "How the wheel opens and how you select on it.",
+          "default": 1,
+          "valueOptions": {
+            "options": [
+              {
+                "value": 1,
+                "text": "Right stick click",
+                "help": "Click and release the right thumbstick to open, then point and click the pointing hand's trigger or A/X to select. When ROCK's setup wizard moves PALM's binding, ROCK's Palm binding opens it."
+              },
+              {
+                "value": 2,
+                "text": "Hold grip and trigger",
+                "help": "Hold the right trigger and grip for half a second to open, then point and release to select. Release on Cancel to close."
+              },
+              {
+                "value": 3,
+                "text": "Custom",
+                "help": "Your own binding and way of selecting, set below. It is kept when you switch back to another mode."
+              }
+            ]
+          },
+          "storage": { "path": ["Controls", "InputMode"] }
+        },
+        {
+          "type": "section",
+          "text": "Custom",
+          "help": "Used while Input mode is Custom.",
+          "enabledWhen": { "setting": "inputMode", "equals": 3 },
+          "content": [
+            {
+              "type": "cf.inputBinding",
+              "valueType": "string",
+              "text": "Open the wheel",
+              "help": "The button that opens the wheel, with an optional button held with it. Touch and stick pushes are not used.",
+              "default": { "hand": "right", "type": "release", "button": "thumbstick" },
+              "valueOptions": {
+                "hands": ["primary", "offhand", "right", "left"],
+                "types": ["press", "tap", "double", "hold", "longpress", "release"],
+                "buttons": ["trigger", "grip", "a", "b", "thumbstick"]
+              },
+              "storage": { "path": ["Controls", "OpenMenu"] }
+            },
+            {
+              "type": "dropdown",
+              "valueType": "string",
+              "text": "Select by",
+              "help": "How you select once the wheel is open.",
+              "default": "press",
+              "valueOptions": {
+                "options": [
+                  {
+                    "value": "press",
+                    "text": "Click",
+                    "help": "Let go of the opening buttons, then click the pointing hand's trigger or A/X. The wheel stays open until you click Cancel."
+                  },
+                  {
+                    "value": "hold",
+                    "text": "Release",
+                    "help": "Point while you hold the opening buttons, and let go to select. A tap or release binding always selects by click."
+                  }
+                ]
+              },
+              "storage": { "path": ["Controls", "Mode"] }
+            }
+          ]
+        },
+        {
+          "type": "section",
+          "text": "Wheel placement",
+          "help": "Where the wheel opens, in front of the hand that opens it. Changes show on the wheel as you make them.",
+          "applies": "live",
+          "content": [
+            {
+              "type": "button",
+              "text": "Open the wheel",
+              "buttonText": "Open",
+              "icon": "window",
+              "help": "Minimizes this menu and opens the wheel, to see your changes on it. This menu comes back when the wheel closes.",
+              "action": { "type": "CallNativeFunction", "function": "openWheel" }
+            },
+            {
+              "id": "wheelDistance",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Distance",
+              "help": "How far ahead of the opening hand the wheel's center is, in game units (about 1.4 cm each).",
+              "default": 85.0,
+              "valueOptions": { "min": 40, "max": 150, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Distance"] }
+            },
+            {
+              "id": "wheelHeight",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Height",
+              "help": "How far above the opening hand the wheel's center is, in game units.",
+              "default": 9.0,
+              "valueOptions": { "min": -40, "max": 40, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Height"] }
+            },
+            {
+              "id": "wheelSide",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Side",
+              "help": "How far right of the opening hand the wheel's center is, in game units; negative moves it left.",
+              "default": 0.0,
+              "valueOptions": { "min": -40, "max": 40, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Side"] }
+            },
+            {
+              "id": "wheelSize",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Size",
+              "help": "The wheel's width and height, in game units.",
+              "default": 95.0,
+              "valueOptions": { "min": 60, "max": 150, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Size"] }
+            },
+            {
+              "id": "wheelFaceHeadset",
+              "type": "switcher",
+              "valueType": "bool",
+              "text": "Face the headset",
+              "help": "Turns the wheel to face you wherever Side and Distance put it. Off, it faces back along the opening hand.",
+              "default": true,
+              "storage": { "path": ["Wheel", "FaceHeadset"] }
+            }
+          ]
+        },
+        {
+          "type": "section",
+          "text": "Pointer aim",
+          "help": "Where each controller points on the wheel.",
+          "content": [
+            {
+              "type": "text",
+              "text": "0° points straight forward. A negative pitch lowers the pointer, and a positive yaw moves it right."
+            },
+            {
+              "type": "section",
+              "text": "Left hand",
+              "content": [
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Pitch",
+                  "help": "Tilts the left hand's pointer up or down.",
+                  "default": 25.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "LeftPitchDegrees"] }
+                },
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Yaw",
+                  "help": "Turns the left hand's pointer left or right.",
+                  "default": 15.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "LeftYawDegrees"] }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": "Right hand",
+              "content": [
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Pitch",
+                  "help": "Tilts the right hand's pointer up or down.",
+                  "default": 25.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "RightPitchDegrees"] }
+                },
+                {
+                  "type": "slider",
+                  "valueType": "float",
+                  "text": "Yaw",
+                  "help": "Turns the right hand's pointer left or right.",
+                  "default": -18.0,
+                  "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+                  "display": { "decimals": 1, "unit": "°" },
+                  "storage": { "path": ["Pointer", "RightYawDegrees"] }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rpsUi",
+      "pageDisplayName": "RPS UI",
+      "help": "RPS UI Framework's settings, which every RPS mod's panels share: the wheel, ROCK's pages and RPS UI's own menu.",
+      "defaultFile": "rpsui",
+      "content": [
+        {
+          "type": "text",
+          "text": "These are RPS UI Framework's settings, kept in its RPS_UI.toml. They apply to every RPS mod's panels about a second after you save."
+        },
+        {
+          "id": "rpsUiTheme",
+          "type": "dropdown",
+          "valueType": "string",
+          "text": "Theme",
+          "help": "The theme every panel draws with: a file of RPS UI's Themes folder. Type a new name to start a theme as a copy of Pip-Boy.",
+          "default": "Pip-Boy",
+          "valueOptions": { "listFromClientCallback": true, "allowTyped": true, "maxLength": 64 },
+          "storage": { "path": ["Display", "Theme"] }
+        },
+        {
+          "id": "rpsUiSharpness",
+          "type": "slider",
+          "valueType": "float",
+          "text": "Sharpness",
+          "help": "Texture pixels for each unit of a panel's layout. Higher is sharper text and uses more video memory.",
+          "default": 1.5,
+          "valueOptions": { "min": 1.0, "max": 3.0, "step": 0.25 },
+          "display": { "decimals": 2 },
+          "storage": { "path": ["Display", "Sharpness"] }
+        },
+        {
+          "id": "rpsUiHapticStrength",
+          "type": "slider",
+          "valueType": "float",
+          "text": "Haptic strength",
+          "help": "How strongly the controller ticks when you press something on a panel. 0 turns it off.",
+          "default": 0.6,
+          "valueOptions": { "min": 0.0, "max": 1.0, "step": 0.1 },
+          "display": { "decimals": 1 },
+          "storage": { "path": ["Controls", "HapticStrength"] }
+        },
+        {
+          "id": "rpsUiGripMoveSeconds",
+          "type": "slider",
+          "valueType": "float",
+          "text": "Grip to move",
+          "help": "Seconds to hold grip on a panel before it follows your hand; release to place it. A shorter grip press is Back.",
+          "default": 0.45,
+          "valueOptions": { "min": 0.2, "max": 1.5, "step": 0.05 },
+          "display": { "decimals": 2, "unit": "s" },
+          "storage": { "path": ["Controls", "GripMoveSeconds"] }
+        }
+      ]
+    }
+  ]
+}

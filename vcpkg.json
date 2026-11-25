@@ -6,7 +6,8 @@
     "nlohmann-json",
     "rapidcsv",
     "rsm-mmio",
-    "spdlog"
+    "spdlog",
+    "tomlplusplus"
   ],
   "overrides": [
     {
