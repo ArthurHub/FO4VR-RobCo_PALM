@@ -246,15 +246,35 @@ void serviceModsConfigRestore(double now) {
  if(now-s.closedSince<kRestoreDelay)return;
  s.restoreModsConfig=false;s.closedSince=0.;mods_config_client::restoreMenu();
 }
+/**
+ * The headset's world position, from the player's HMD node; none without a player or a finite node. Game thread.
+ */
+std::optional<std::array<float,3>> headsetPosition() {
+ const auto* player=RE::PlayerCharacter::GetSingleton();
+ const auto* hmd=player?player->vrNodes.hmdNode:nullptr;
+ if(!hmd)return std::nullopt;
+ const auto& at=hmd->world.translate;
+ if(!std::isfinite(at.x) || !std::isfinite(at.y) || !std::isfinite(at.z))return std::nullopt;
+ return std::array<float,3>{at.x,at.y,at.z};
+}
 std::optional<rpsui::api::framework::PanelPose> poseFor(const rpsui::api::input::Frame& frame) {
  const auto& t=frame.hands[physicalHand(state().controls.binding.hand,frame.leftHanded)];
  if(!t.valid)return {};
  float x=t.forward[0],y=t.forward[1];const float n=std::hypot(x,y);
  if(!std::isfinite(n) || n<.05f)return {};
- x/=n;y/=n;rpsui::api::framework::PanelPose p;
- p.center[0]=t.position[0]+x*85;p.center[1]=t.position[1]+y*85;p.center[2]=t.position[2]+9;
- p.right[0]=y;p.right[1]=-x;p.right[2]=0;p.front[0]=-x;p.front[1]=-y;p.front[2]=0;
- p.physicalWidth=95;p.physicalHeight=95;
+ x/=n;y/=n;rpsui::api::framework::PanelPose p;const auto placement=snapshotWheelPlacement();
+ // (y,-x) is the player's right on the ground plane, as the panel's right vector below.
+ p.center[0]=t.position[0]+x*placement.distance+y*placement.side;p.center[1]=t.position[1]+y*placement.distance-x*placement.side;
+ p.center[2]=t.position[2]+placement.height;
+ // The panel's front points back at the player: along the hand's direction, or at the headset on the ground plane,
+ // so an offset wheel still faces the player. It stays upright either way.
+ float fx=-x,fy=-y;
+ if(placement.faceHeadset)if(const auto headset=headsetPosition()) {
+  const float dx=(*headset)[0]-p.center[0],dy=(*headset)[1]-p.center[1],length=std::hypot(dx,dy);
+  if(std::isfinite(length) && length>1.f){fx=dx/length;fy=dy/length;}
+ }
+ p.right[0]=-fy;p.right[1]=fx;p.right[2]=0;p.front[0]=fx;p.front[1]=fy;p.front[2]=0;
+ p.physicalWidth=placement.size;p.physicalHeight=placement.size;
  for(float v:p.center)if(!std::isfinite(v) || std::fabs(v)>1.e8f)return {};
  return p;
 }

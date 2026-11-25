@@ -3,6 +3,7 @@
 #include "Runtime.h"
 #include "PalmTheme.h"
 #include "WheelConfig.h"
+#include "PalmControls.h"
 #include "IconAtlas.h"
 #include "RpsUiQuery.h"
 #include <imgui.h>
@@ -89,7 +90,8 @@ bool installPanel() {
  std::snprintf(panel.panelId,sizeof(panel.panelId),"robco.palm.main");
  std::snprintf(panel.displayName,sizeof(panel.displayName),"RobCo PALM");
  panel.layoutWidth=1024;panel.layoutHeight=1024;
- panel.defaultPhysicalWidth=95;panel.minimumPhysicalWidth=95;panel.maximumPhysicalWidth=95;
+ // [Wheel] Size sets the width at each open, within the range RPS UI holds the panel to.
+ panel.defaultPhysicalWidth=WheelPlacement{}.size;panel.minimumPhysicalWidth=kWheelMinimumSize;panel.maximumPhysicalWidth=kWheelMaximumSize;
  panel.flags=static_cast<std::uint32_t>(rpsui::api::framework::PanelFlag::Transparent)|
   static_cast<std::uint32_t>(rpsui::api::framework::PanelFlag::FixedSize)|static_cast<std::uint32_t>(rpsui::api::framework::PanelFlag::CircularInput);
  panel.sortOrder=300;panel.imgui=RPSUI_IMGUI_BUILD();panel.setupCallback=setupFrame;panel.drawCallback=drawFrame;

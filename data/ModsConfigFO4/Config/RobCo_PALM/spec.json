@@ -7,7 +7,8 @@
   "specVersion": 1,
   "f4sePluginRequirements": ["RobCoPALM"],
   "files": {
-    "palm": { "format": "toml", "root": "myGames", "path": "Mods_Config/RobCo_PALM/PALM.toml" }
+    "palm": { "format": "toml", "root": "myGames", "path": "Mods_Config/RobCo_PALM/PALM.toml" },
+    "rpsui": { "format": "toml", "root": "myGames", "path": "Mods_Config/RPS_UI_Framework/RPS_UI.toml" }
   },
   "defaultFile": "palm",
   "applies": "save",
@@ -227,6 +228,75 @@
         },
         {
           "type": "section",
+          "text": "Wheel placement",
+          "help": "Where the wheel opens, in front of the hand that opens it. Changes show on the wheel as you make them.",
+          "applies": "live",
+          "content": [
+            {
+              "type": "button",
+              "text": "Open the wheel",
+              "buttonText": "Open",
+              "icon": "window",
+              "help": "Minimizes this menu and opens the wheel, to see your changes on it. This menu comes back when the wheel closes.",
+              "action": { "type": "CallNativeFunction", "function": "openWheel" }
+            },
+            {
+              "id": "wheelDistance",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Distance",
+              "help": "How far ahead of the opening hand the wheel's center is, in game units (about 1.4 cm each).",
+              "default": 85.0,
+              "valueOptions": { "min": 40, "max": 150, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Distance"] }
+            },
+            {
+              "id": "wheelHeight",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Height",
+              "help": "How far above the opening hand the wheel's center is, in game units.",
+              "default": 9.0,
+              "valueOptions": { "min": -40, "max": 40, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Height"] }
+            },
+            {
+              "id": "wheelSide",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Side",
+              "help": "How far right of the opening hand the wheel's center is, in game units; negative moves it left.",
+              "default": 0.0,
+              "valueOptions": { "min": -40, "max": 40, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Side"] }
+            },
+            {
+              "id": "wheelSize",
+              "type": "slider",
+              "valueType": "float",
+              "text": "Size",
+              "help": "The wheel's width and height, in game units.",
+              "default": 95.0,
+              "valueOptions": { "min": 60, "max": 150, "step": 1 },
+              "display": { "decimals": 0 },
+              "storage": { "path": ["Wheel", "Size"] }
+            },
+            {
+              "id": "wheelFaceHeadset",
+              "type": "switcher",
+              "valueType": "bool",
+              "text": "Face the headset",
+              "help": "Turns the wheel to face you wherever Side and Distance put it. Off, it faces back along the opening hand.",
+              "default": true,
+              "storage": { "path": ["Wheel", "FaceHeadset"] }
+            }
+          ]
+        },
+        {
+          "type": "section",
           "text": "Pointer aim",
           "help": "Where each controller points on the wheel.",
           "content": [
@@ -287,6 +357,61 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "rpsUi",
+      "pageDisplayName": "RPS UI",
+      "help": "RPS UI Framework's settings, which every RPS mod's panels share: the wheel, ROCK's pages and RPS UI's own menu.",
+      "defaultFile": "rpsui",
+      "content": [
+        {
+          "type": "text",
+          "text": "These are RPS UI Framework's settings, kept in its RPS_UI.toml. They apply to every RPS mod's panels about a second after you save."
+        },
+        {
+          "id": "rpsUiTheme",
+          "type": "dropdown",
+          "valueType": "string",
+          "text": "Theme",
+          "help": "The theme every panel draws with: a file of RPS UI's Themes folder. Type a new name to start a theme as a copy of Pip-Boy.",
+          "default": "Pip-Boy",
+          "valueOptions": { "listFromClientCallback": true, "allowTyped": true, "maxLength": 64 },
+          "storage": { "path": ["Display", "Theme"] }
+        },
+        {
+          "id": "rpsUiSharpness",
+          "type": "slider",
+          "valueType": "float",
+          "text": "Sharpness",
+          "help": "Texture pixels for each unit of a panel's layout. Higher is sharper text and uses more video memory.",
+          "default": 1.5,
+          "valueOptions": { "min": 1.0, "max": 3.0, "step": 0.25 },
+          "display": { "decimals": 2 },
+          "storage": { "path": ["Display", "Sharpness"] }
+        },
+        {
+          "id": "rpsUiHapticStrength",
+          "type": "slider",
+          "valueType": "float",
+          "text": "Haptic strength",
+          "help": "How strongly the controller ticks when you press something on a panel. 0 turns it off.",
+          "default": 0.6,
+          "valueOptions": { "min": 0.0, "max": 1.0, "step": 0.1 },
+          "display": { "decimals": 1 },
+          "storage": { "path": ["Controls", "HapticStrength"] }
+        },
+        {
+          "id": "rpsUiGripMoveSeconds",
+          "type": "slider",
+          "valueType": "float",
+          "text": "Grip to move",
+          "help": "Seconds to hold grip on a panel before it follows your hand; release to place it. A shorter grip press is Back.",
+          "default": 0.45,
+          "valueOptions": { "min": 0.2, "max": 1.5, "step": 0.05 },
+          "display": { "decimals": 2, "unit": "s" },
+          "storage": { "path": ["Controls", "GripMoveSeconds"] }
         }
       ]
     }

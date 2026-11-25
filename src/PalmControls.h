@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <string>
 #include <vector>
 #include <RPS/Settings/Store.h>
@@ -12,6 +14,16 @@
 namespace wheel {
 enum class OpenMode { Hold, Press };
 enum class InputMode { StickClick=1, GripTriggerHold=2, Custom=3 };
+// [Wheel] Size's range. The wheel's panel is registered with RPS UI for it, and RPS UI refuses an open outside it.
+inline constexpr float kWheelMinimumSize=60.f,kWheelMaximumSize=150.f;
+// Where the wheel opens, in game units from the opening hand: its center ahead, above and to the right of it (side,
+// negative to the left, as the player faces), and its width and height. faceHeadset turns it to face the headset;
+// without it, it faces back along the opening hand's direction.
+struct WheelPlacement {
+ float distance{85.f},height{9.f},size{95.f},side{0.f};
+ bool faceHeadset{true};
+ bool operator==(const WheelPlacement&) const=default;
+};
 // Left, right. The defaults are the aim tested in game: both pointers raised 25 degrees, each turned in toward the middle.
 struct PointerAim {
  std::array<float,2> pitch{25.f,25.f},yaw{15.f,-18.f};
@@ -136,6 +148,9 @@ int logLevel(const RPS::Settings::Store& store);
 int snapshotLogLevel();
 bool snapshotDeveloperEnabled();
 PointerAim snapshotPointerAim();
+WheelPlacement snapshotWheelPlacement();
+bool previewWheelPlacement(std::string_view key,std::optional<float> value);
+void previewWheelFacing(std::optional<bool> faceHeadset);
 bool takePointerAimChange();
 void setGestureIntegrationAvailable(bool available);
 bool gestureIntegrationAvailable();

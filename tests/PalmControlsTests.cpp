@@ -346,6 +346,26 @@ int main(){try {
  write(path,"[Controls]\nInputMode = 3\nOpenMenu = { hand = \"sideways\" }\n[Logging]\nLogLevel = 9\n");(void)reloadControls();
  check(snapshotControls().binding.hand==Hand::Left,"an unreadable binding replaced the controls on reload");
  check(snapshotLogLevel()==2,"an out-of-range log level was not info");
+ // Wheel placement: PALM.toml's values, with Mods Config's live previews over them until a Save or Discard.
+ check(snapshotWheelPlacement()==WheelPlacement{},"a file without [Wheel] did not use the default placement");
+ write(path,"[Wheel]\nDistance = 70.0\nHeight = -5.0\nSize = 120.0\n");
+ check(reloadControls().empty(),"a valid [Wheel] reported a problem");
+ {
+  const auto sameValue=[](float a,float b){return std::fabs(a-b)<1e-4f;};
+  auto placement=snapshotWheelPlacement();
+  check(sameValue(placement.distance,70.f) && sameValue(placement.height,-5.f) && sameValue(placement.size,120.f),"a reload did not read the wheel's placement");
+  check(previewWheelPlacement("Distance",100.f) && sameValue(snapshotWheelPlacement().distance,100.f),"a live distance did not show over the file's");
+  check(!previewWheelPlacement("Distance",500.f) && !previewWheelPlacement("Depth",50.f),"an out-of-range or unknown placement was accepted");
+  check(previewWheelPlacement("Side",-12.f) && sameValue(snapshotWheelPlacement().side,-12.f),"a live side offset did not show");
+  check(snapshotWheelPlacement().faceHeadset,"the wheel does not face the headset by default");
+  previewWheelFacing(false);check(!snapshotWheelPlacement().faceHeadset,"a live Face the headset did not show");
+  previewWheelFacing(std::nullopt);check(snapshotWheelPlacement().faceHeadset,"a Discard did not return to the file's Face the headset");
+  check(previewWheelPlacement("Distance",std::nullopt) && sameValue(snapshotWheelPlacement().distance,70.f),"a Discard did not return to the file's distance");
+  (void)previewWheelPlacement("Size",80.f);(void)reloadControls();
+  check(sameValue(snapshotWheelPlacement().size,120.f),"a Save's read of the file did not end the live size");
+ }
+ write(path,"[Wheel]\nSize = 10.0\n");
+ check(!reloadControls().empty(),"an out-of-range wheel size was not reported");
  // An INI with a chosen preset keeps it.
  std::filesystem::remove(path);write(ini,"[Controls]\niInputMode=2\nsMode=press\nsOpenMenu=right release thumbstick suppress\n");
  initializeControls(path);check(snapshotInputMode()==InputMode::GripTriggerHold,"a migrated preset was not kept");

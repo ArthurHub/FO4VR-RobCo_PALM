@@ -6,6 +6,7 @@
 #include "WheelConfig.h"
 #include "Inventory.h"
 #include <ModsConfigFO4Api.h>
+#include <ShlObj.h>
 
 namespace wheel::mods_config_client {
 namespace {
@@ -31,6 +32,39 @@ void onSaved(const Saved&) {
   else spdlog::info("PALM Developer wheel {} after a Mods Config Save",developer?"enabled":"disabled");
  }
  spdlog::info("PALM.toml read again after a Mods Config Save");
+}
+
+/**
+ * A live change of a [Wheel] value on the Controls page: the wheel opens with it until the Save, which reads it from
+ * PALM.toml, or the Discard, which ends it.
+ */
+void onChanged(const ::mods_config::api::Change& change) {
+ // Only PALM.toml has a [Wheel] table among the spec's files.
+ if(change.path.size()!=2 || change.path[0]!="Wheel")return;
+ if(change.path[1]=="FaceHeadset") {
+  const auto* face=std::get_if<bool>(&change.value);
+  previewWheelFacing(change.discard || !face?std::nullopt:std::optional<bool>(*face));return;
+ }
+ const auto* value=std::get_if<float>(&change.value);
+ (void)previewWheelPlacement(change.path[1],change.discard || !value?std::nullopt:std::optional<float>(*value));
+}
+
+/**
+ * The themes RPS UI Framework can draw with, for the RPS UI page's Theme: the files of its Themes folder, by name.
+ */
+std::vector<::mods_config::api::Option> rpsUiThemes() {
+ std::vector<::mods_config::api::Option> themes;
+ PWSTR documents{};
+ if(FAILED(SHGetKnownFolderPath(FOLDERID_Documents,0,nullptr,&documents)))return themes;
+ const auto folder=std::filesystem::path(documents)/"My Games"/"Fallout4VR"/"Mods_Config"/"RPS_UI_Framework"/"Themes";
+ CoTaskMemFree(documents);
+ std::error_code error;
+ for(const auto& entry:std::filesystem::directory_iterator(folder,error))
+  if(entry.is_regular_file(error) && entry.path().extension()==".toml") {
+   const auto name=entry.path().stem().string();themes.push_back({.value=name,.text=name});
+  }
+ std::ranges::sort(themes,{},&::mods_config::api::Option::text);
+ return themes;
 }
 
 /**
@@ -110,6 +144,8 @@ void connect() noexcept {
   for(const char* page:kItemsPages)
    if(const auto category=wheelItemsPageCategory(page))client.addPageContent(page,[category=*category]{return wheelItemsPage(category);});
   client.subscribeToSaves(&onSaved);
+  client.subscribeToChanges(&onChanged);
+  client.addOptions("rpsUiTheme",&rpsUiThemes);
   if(const auto* messaging=F4SE::GetMessagingInterface())
    (void)messaging->RegisterListener(&onModsConfigMessage,::mods_config::api::MODS_CONFIG_FO4_F4SE_NAME);
   if(const int error=client.connect(kModName);error!=0)

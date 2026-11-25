@@ -14,7 +14,9 @@ namespace {
 namespace settings=RPS::Settings;
 // controls retains the custom binding while a fixed input mode is selected.
 // store is PALM.toml's store; every use holds mutex.
-struct State {std::mutex mutex;Controls controls;InputMode inputMode{InputMode::StickClick};PointerAim aim;std::unique_ptr<settings::Store> store;std::atomic_bool aimChanged{},gestures{true};};
+// placementPreview and facingPreview hold Mods Config's live values of [Wheel] until a Save or Discard.
+struct State {std::mutex mutex;Controls controls;InputMode inputMode{InputMode::StickClick};PointerAim aim;WheelPlacement placement;
+ std::array<std::optional<float>,4> placementPreview;std::optional<bool> facingPreview;std::unique_ptr<settings::Store> store;std::atomic_bool aimChanged{},gestures{true};};
 State& state(){static State value;return value;}
 constexpr std::array pitchKeys{"LeftPitchDegrees","RightPitchDegrees"};
 constexpr std::array yawKeys{"LeftYawDegrees","RightYawDegrees"};
@@ -26,6 +28,18 @@ bool readAngle(const settings::Store& store,const char* key,float& value) {
  const auto& text=store.find("Pointer",key)->value;float parsed{};
  const auto result=std::from_chars(text.data(),text.data()+text.size(),parsed);
  if(result.ec!=std::errc{} || result.ptr!=text.data()+text.size() || !std::isfinite(parsed) || std::fabs(parsed)>90)return false;
+ value=parsed;return true;
+}
+// [Wheel]'s keys, in WheelPlacement's order, with the range each reads in.
+struct PlacementKey {const char* key;float minimum,maximum;};
+constexpr std::array<PlacementKey,4> kPlacementKeys{{{"Distance",40.f,150.f},{"Height",-40.f,40.f},{"Size",kWheelMinimumSize,kWheelMaximumSize},{"Side",-40.f,40.f}}};
+float& placementValue(WheelPlacement& placement,std::size_t index) {
+ return index==0?placement.distance:index==1?placement.height:index==2?placement.size:placement.side;
+}
+bool readNumber(const settings::Store& store,const char* table,const char* key,float minimum,float maximum,float& value) {
+ const auto& text=store.find(table,key)->value;float parsed{};
+ const auto result=std::from_chars(text.data(),text.data()+text.size(),parsed);
+ if(result.ec!=std::errc{} || result.ptr!=text.data()+text.size() || !std::isfinite(parsed) || parsed<minimum || parsed>maximum)return false;
  value=parsed;return true;
 }
 std::string angleText(float value){return settings::normalizeValue(settings::ValueType::Float,std::to_string(value)).value_or("0.0");}
@@ -48,6 +62,19 @@ std::vector<settings::Definition> palmDefinitions() {
   "Applies when Mods Config saves; a mod that adds its actions only at startup, as ROCK does, shows them after a restart.",player,settings::ValueType::Boolean,"false"});
  result.push_back({"Logging","LogLevel","04. Logging","How much PALM writes to RobCoPALM.log: 2 = Info, 3 = Warnings, 4 = Errors, 6 = Off.\n"
   "Numbered as in ROCK and FRIK; 0 = Trace and 1 = Debug write the same as Info. Applies when Mods Config saves.",player,settings::ValueType::Integer,"2"});
+ {
+  WheelPlacement placement;
+  constexpr std::array<const char*,4> help{
+   "How far ahead of the opening hand the wheel's center is, in game units (about 1.4 cm each). Range: 40 to 150.",
+   "How far above the opening hand the wheel's center is, in game units. Range: -40 to 40.",
+   "The wheel's width and height, in game units. Range: 60 to 150.",
+   "How far right of the opening hand the wheel's center is, in game units; negative moves it left. Range: -40 to 40."};
+  for(std::size_t i=0;i<kPlacementKeys.size();++i)
+   result.push_back({"Wheel",kPlacementKeys[i].key,"05. Wheel placement",std::string(help[i])+"\nTune it in game on RobCo PALM's Controls page in Mods Config FO4 VR.",
+    player,settings::ValueType::Float,angleText(placementValue(placement,i))});
+  result.push_back({"Wheel","FaceHeadset","05. Wheel placement","Turns the wheel to face the headset, wherever Side and Distance put it; off, it faces back along the opening hand.\n"
+   "Tune it in game on RobCo PALM's Controls page in Mods Config FO4 VR.",player,settings::ValueType::Boolean,placement.faceHeadset?"true":"false"});
+ }
  return result;
 }
 // The keys of PALM.ini, with the defaults it was written with.
@@ -182,6 +209,18 @@ std::vector<std::string> readStoreValues(State& s) {
   valid=readAngle(store,yawKeys[hand],s.aim.yaw[hand]) && valid;
  }
  if(!valid)problems.push_back("PALM.toml [Pointer]: an angle that is not a number from -90 to 90 keeps its default");
+ for(std::size_t i=0;i<kPlacementKeys.size();++i) {
+  const auto& key=kPlacementKeys[i];
+  if(!readNumber(store,"Wheel",key.key,key.minimum,key.maximum,placementValue(s.placement,i)))
+   problems.push_back(std::format("PALM.toml [Wheel] {} is not a number from {} to {}; the value PALM has is kept",key.key,key.minimum,key.maximum));
+ }
+ {
+  const auto& face=store.find("Wheel","FaceHeadset")->value;
+  if(face=="true" || face=="false")s.placement.faceHeadset=face=="true";
+  else problems.push_back("PALM.toml [Wheel] FaceHeadset is not true or false; the value PALM has is kept");
+ }
+ // The file has what a Save wrote, so Mods Config's previews end.
+ s.placementPreview={};s.facingPreview.reset();
  s.aimChanged=true;
  return problems;
 }
@@ -191,7 +230,7 @@ std::vector<std::string> readStoreValues(State& s) {
  * read. An empty path keeps the defaults in memory only (the desktop preview).
  */
 std::vector<std::string> initializeControls(const std::filesystem::path& path) {
- auto& s=state();std::scoped_lock lock(s.mutex);s.store.reset();s.controls={};s.inputMode=InputMode::StickClick;s.aim={};s.aimChanged=true;
+ auto& s=state();std::scoped_lock lock(s.mutex);s.store.reset();s.controls={};s.inputMode=InputMode::StickClick;s.aim={};s.placement={};s.placementPreview={};s.facingPreview.reset();s.aimChanged=true;
  if(path.empty())return {};
  try{s.store=openPalmSettings(path);}
  catch(const std::exception& error){return {std::format("Could not open {}: {}",path.filename().string(),error.what())};}
@@ -227,6 +266,30 @@ int snapshotLogLevel(){auto& s=state();std::scoped_lock lock(s.mutex);return s.s
  */
 bool snapshotDeveloperEnabled(){auto& s=state();std::scoped_lock lock(s.mutex);return s.store && s.store->find("Developer","Enabled")->value=="true";}
 PointerAim snapshotPointerAim(){auto& s=state();std::scoped_lock lock(s.mutex);return s.aim;}
+/**
+ * Where the wheel opens: PALM.toml's [Wheel] values, with Mods Config's live previews over them.
+ */
+WheelPlacement snapshotWheelPlacement() {
+ auto& s=state();std::scoped_lock lock(s.mutex);auto placement=s.placement;
+ for(std::size_t i=0;i<s.placementPreview.size();++i)if(s.placementPreview[i])placementValue(placement,i)=*s.placementPreview[i];
+ if(s.facingPreview)placement.faceHeadset=*s.facingPreview;
+ return placement;
+}
+/**
+ * Sets Mods Config's live [Wheel] FaceHeadset over PALM.toml's until the next read of the file; none ends it.
+ */
+void previewWheelFacing(std::optional<bool> faceHeadset){auto& s=state();std::scoped_lock lock(s.mutex);s.facingPreview=faceHeadset;}
+/**
+ * Sets Mods Config's live value of a [Wheel] key over PALM.toml's until the next read of the file; none ends it, as a
+ * Discard does. False for another key, or a value outside the key's range.
+ */
+bool previewWheelPlacement(std::string_view key,std::optional<float> value) {
+ for(std::size_t i=0;i<kPlacementKeys.size();++i)if(key==kPlacementKeys[i].key) {
+  if(value && (!std::isfinite(*value) || *value<kPlacementKeys[i].minimum || *value>kPlacementKeys[i].maximum))return false;
+  auto& s=state();std::scoped_lock lock(s.mutex);s.placementPreview[i]=value;return true;
+ }
+ return false;
+}
 bool takePointerAimChange(){return state().aimChanged.exchange(false);}
 void setGestureIntegrationAvailable(bool available){state().gestures=available;}
 bool gestureIntegrationAvailable(){return state().gestures.load();}
