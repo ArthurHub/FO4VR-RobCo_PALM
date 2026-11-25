@@ -1,5 +1,4 @@
 #include "PalmControls.h"
-#include "tools/render/ConfigUi.h"
 #include <Windows.h>
 #include <atomic>
 #include <mutex>
@@ -15,7 +14,7 @@ namespace {
 namespace settings=RPS::Settings;
 // controls retains the custom binding while a fixed input mode is selected.
 // store is PALM.toml's store; every use holds mutex.
-struct State {std::mutex mutex;Controls controls;InputMode inputMode{InputMode::StickClick};PointerAim aim;std::unique_ptr<settings::Store> store;std::string status;bool dirty{},aimDirty{};std::atomic_bool save{},aimChanged{},gestures{true};};
+struct State {std::mutex mutex;Controls controls;InputMode inputMode{InputMode::StickClick};PointerAim aim;std::unique_ptr<settings::Store> store;std::atomic_bool aimChanged{},gestures{true};};
 State& state(){static State value;return value;}
 constexpr std::array pitchKeys{"LeftPitchDegrees","RightPitchDegrees"};
 constexpr std::array yawKeys{"LeftYawDegrees","RightYawDegrees"};
@@ -132,11 +131,6 @@ bool parseControls(std::string_view mode,std::string_view text,Controls& out,std
 }
 Controls snapshotControls(InputMode* inputMode){auto& s=state();std::scoped_lock lock(s.mutex);if(inputMode)*inputMode=s.inputMode;return controlsForMode(s.inputMode,s.controls);}
 InputMode snapshotInputMode(){auto& s=state();std::scoped_lock lock(s.mutex);return s.inputMode;}
-bool applyInputMode(InputMode mode) {
- if(mode!=InputMode::StickClick && mode!=InputMode::GripTriggerHold && mode!=InputMode::Custom)return false;
- auto& s=state();std::scoped_lock lock(s.mutex);s.inputMode=mode;s.save=true;
- s.status=!s.store?"Preview controls updated":"Saving controls...";return true;
-}
 std::unique_ptr<settings::Store> openPalmSettings(const std::filesystem::path& path) {
  if(path.empty())return {};
  const auto directory=path.parent_path(),ini=directory/"PALM.ini";
@@ -167,35 +161,41 @@ std::unique_ptr<settings::Store> openPalmSettings(const std::filesystem::path& p
 }
 namespace {
 /**
- * Applies the values the store read: the controls, the input mode and the pointer aim. A value that does not read
- * keeps the one PALM has, and says so in the status; the runtime takes the aim at its next frame.
+ * Applies the values the store read: the controls, the input mode and the pointer aim, and returns the problems of
+ * those that do not read, each keeping the value PALM has. The runtime takes the aim at its next frame.
  */
-void readStoreValues(State& s) {
+std::vector<std::string> readStoreValues(State& s) {
  const auto& store=*s.store;
- if(!store.messages().empty())s.status=store.messages().front();
- Controls value;
- if(parseControls(store.find("Controls","Mode")->value,store.find("Controls","OpenMenu")->value,value,s.status)){s.controls=value;if(store.messages().empty())s.status="Controls loaded";}
+ std::vector<std::string> problems;
+ Controls value;std::string error;
+ if(parseControls(store.find("Controls","Mode")->value,store.find("Controls","OpenMenu")->value,value,error))s.controls=value;
+ else problems.push_back("PALM.toml [Controls] OpenMenu: "+error+"; the binding PALM has is kept");
  // Presets are authoritative; Mode and OpenMenu store Custom's binding.
  const auto& selected=store.find("Controls","InputMode")->value;
  if(selected=="1")s.inputMode=InputMode::StickClick;
  else if(selected=="2")s.inputMode=InputMode::GripTriggerHold;
  else if(selected=="3")s.inputMode=InputMode::Custom;
- else s.status="Invalid input mode; using mode 1";
+ else problems.push_back("PALM.toml [Controls] InputMode is not 1, 2 or 3; mode 1 is used");
  bool valid=true;
  for(unsigned hand=0;hand<2;++hand) {
   valid=readAngle(store,pitchKeys[hand],s.aim.pitch[hand]) && valid;
   valid=readAngle(store,yawKeys[hand],s.aim.yaw[hand]) && valid;
  }
- if(!valid)s.status="Invalid pointer angle; using its default";
+ if(!valid)problems.push_back("PALM.toml [Pointer]: an angle that is not a number from -90 to 90 keeps its default");
  s.aimChanged=true;
+ return problems;
 }
 }
-void initializeControls(const std::filesystem::path& path) {
- auto& s=state();std::scoped_lock lock(s.mutex);s.store.reset();s.controls={};s.inputMode=InputMode::StickClick;s.aim={};s.dirty=false;s.save=false;s.status.clear();s.aimDirty=false;s.aimChanged=true;
- if(path.empty())return;
+/**
+ * Opens PALM.toml at path and applies its controls and pointer aim, returning the problems of the values that do not
+ * read. An empty path keeps the defaults in memory only (the desktop preview).
+ */
+std::vector<std::string> initializeControls(const std::filesystem::path& path) {
+ auto& s=state();std::scoped_lock lock(s.mutex);s.store.reset();s.controls={};s.inputMode=InputMode::StickClick;s.aim={};s.aimChanged=true;
+ if(path.empty())return {};
  try{s.store=openPalmSettings(path);}
- catch(const std::exception& error){s.status=std::format("Could not open {}: {}",path.filename().string(),error.what());return;}
- readStoreValues(s);
+ catch(const std::exception& error){return {std::format("Could not open {}: {}",path.filename().string(),error.what())};}
+ return readStoreValues(s);
 }
 /**
  * Reads PALM.toml again after another editor saved it, as Mods Config FO4 VR does, and returns the problems the read
@@ -205,8 +205,9 @@ std::vector<std::string> reloadControls() {
  auto& s=state();std::scoped_lock lock(s.mutex);
  if(!s.store)return {};
  s.store->load(false);
- readStoreValues(s);
- return s.store->messages();
+ auto problems=s.store->messages();
+ for(auto& problem:readStoreValues(s))problems.push_back(std::move(problem));
+ return problems;
 }
 /**
  * [Logging] LogLevel as spdlog's level number: 0 = trace to 6 = off, as ROCK and FRIK number it. A value outside that
@@ -225,153 +226,8 @@ int snapshotLogLevel(){auto& s=state();std::scoped_lock lock(s.mutex);return s.s
  * [Developer] Enabled as PALM.toml held it at its last read; off before initializeControls opened it.
  */
 bool snapshotDeveloperEnabled(){auto& s=state();std::scoped_lock lock(s.mutex);return s.store && s.store->find("Developer","Enabled")->value=="true";}
-bool applyControls(const Controls& controls,bool queueSave) {
- Controls validated;std::string error;
- if(!parseControls(controls.mode==OpenMode::Hold?"hold":"press",bindingText(controls),validated,error)){auto& s=state();std::scoped_lock lock(s.mutex);s.status=error;return false;}
- auto& s=state();std::scoped_lock lock(s.mutex);
- if(s.inputMode!=InputMode::Custom){s.status="Select mode 3 - Custom to remap controls";return false;}
- s.controls=validated;s.dirty=true;if(queueSave)s.save=true;s.status=!s.store?"Preview controls updated":"Saving controls...";return true;
-}
-bool takeControlsSaveRequest(){return state().save.exchange(false);}
-void persistControls() {
- auto& s=state();std::scoped_lock lock(s.mutex);
- if(!s.store){s.dirty=false;return;}
- try {
-  const auto mode=std::to_string(static_cast<int>(s.inputMode)),binding=bindingText(s.controls);
-  std::array<std::string,4> angles{angleText(s.aim.pitch[0]),angleText(s.aim.pitch[1]),angleText(s.aim.yaw[0]),angleText(s.aim.yaw[1])};
-  const std::array<settings::Change,7> changes{{
-   {"Controls","InputMode",mode},{"Controls","Mode",s.controls.mode==OpenMode::Hold?"hold":"press"},{"Controls","OpenMenu",binding},
-   {"Pointer",pitchKeys[0],angles[0]},{"Pointer",pitchKeys[1],angles[1]},{"Pointer",yawKeys[0],angles[2]},{"Pointer",yawKeys[1],angles[3]}}};
-  const bool written=s.store->setValues(settings::Group::Player,changes);
-  s.dirty=false;
-  s.status=written?"Settings saved to PALM.toml":"Could not save PALM.toml ("+s.store->error()+"); controls apply to this session";
- }catch(...){s.dirty=false;s.status="Could not save PALM.toml; controls apply to this session";}
-}
 PointerAim snapshotPointerAim(){auto& s=state();std::scoped_lock lock(s.mutex);return s.aim;}
 bool takePointerAimChange(){return state().aimChanged.exchange(false);}
-bool applyPointerAim(const PointerAim& aim,bool commit) {
- for(unsigned side=0;side<2;++side)
-  if(!std::isfinite(aim.pitch[side]) || !std::isfinite(aim.yaw[side]) || std::fabs(aim.pitch[side])>90 || std::fabs(aim.yaw[side])>90)return false;
- auto& s=state();std::scoped_lock lock(s.mutex);s.aim=aim;s.aimDirty=!commit;
- if(commit){s.aimChanged=true;s.save=true;}
- s.status=!s.store?"Preview aim updated":commit?"Saving pointer aim...":"Release to apply";return true;
-}
-void drawPointerAim() {
- using namespace devui;
- auto value=snapshotPointerAim();bool changed=false;
- visual::heading("Pointer aim","Fine-tune where each controller points.");
- {visual::Font font(render::FontRole::Body,18);ImGui::TextWrapped("0 degrees points straight forward. Negative pitch lowers the pointer. Positive yaw moves it right. Release a slider to apply its change.");}
- ImGui::Dummy({0,14});
- if(ImGui::BeginTable("pointer-aim",2,ImGuiTableFlags_SizingStretchSame)) {
-  for(unsigned hand=0;hand<2;++hand) {
-   ImGui::TableNextColumn();ImGui::PushID(static_cast<int>(hand));ImGui::BeginGroup();
-   {visual::Font font(render::FontRole::Medium,24);ImGui::TextUnformatted(hand?"RIGHT HAND":"LEFT HAND");}
-   const auto adjust=[&](const char* label,const char* minus,const char* plus,float& degrees) {
-    visual::caption(label);ImGui::PushID(label);ImGui::SetNextItemWidth(-1);
-    changed|=ImGui::SliderFloat("##angle",&degrees,-90,90,"%+.1f deg",ImGuiSliderFlags_AlwaysClamp);
-    const float width=(ImGui::GetContentRegionAvail().x-ImGui::GetStyle().ItemSpacing.x)/2;
-    if(visual::button(minus,{width,40})){degrees=std::max(-90.f,degrees-1);changed=true;}
-    ImGui::SameLine();if(visual::button(plus,{width,40})){degrees=std::min(90.f,degrees+1);changed=true;}
-    ImGui::PopID();ImGui::Dummy({0,10});
-   };
-   adjust("Pitch / up-down","Down 1","Up 1",value.pitch[hand]);
-   adjust("Yaw / left-right","Left 1","Right 1",value.yaw[hand]);
-   if(visual::button("Reset to defaults",{ImGui::GetContentRegionAvail().x,40})){const PointerAim defaults;value.pitch[hand]=defaults.pitch[hand];value.yaw[hand]=defaults.yaw[hand];changed=true;}
-   ImGui::EndGroup();ImGui::PopID();
-  }
-  ImGui::EndTable();
- }
- if(changed)(void)applyPointerAim(value,!ImGui::IsAnyItemActive());
- {auto& s=state();std::scoped_lock lock(s.mutex);
-  if(s.aimDirty && !ImGui::IsAnyItemActive()){s.aimDirty=false;s.aimChanged=true;s.save=true;}
-  visual::Font font(render::FontRole::Body,18);ImGui::TextColored(visual::muted(),"%s",s.status.c_str());
- }
- ImGui::Dummy({0,14});visual::caption("AIM TEST - point at the center with either hand");
- const auto start=ImGui::GetCursorScreenPos();const ImVec2 size{ImGui::GetContentRegionAvail().x,160};
- const ImVec2 center{start.x+size.x*.5f,start.y+size.y*.5f};auto* draw=ImGui::GetWindowDrawList();
- draw->AddRectFilled(start,{start.x+size.x,start.y+size.y},visual::color(visual::surface()));
- const auto ink=visual::color(visual::muted());
- draw->AddRect(start,{start.x+size.x,start.y+size.y},ink);
- draw->AddLine({center.x-42,center.y},{center.x+42,center.y},ink);
- draw->AddLine({center.x,center.y-42},{center.x,center.y+42},ink);
- draw->AddCircle(center,25,ink,32);draw->AddCircle(center,4,visual::color(visual::accent()),16,2);
- ImGui::Dummy(size);
-}
 void setGestureIntegrationAvailable(bool available){state().gestures=available;}
 bool gestureIntegrationAvailable(){return state().gestures.load();}
-void drawControls() {
- using namespace devui;using namespace f4cf::vrcf;
- visual::heading("Controls","Choose how the wheel opens and makes selections.");
- auto inputMode=snapshotInputMode();
- visual::caption("Input mode");
- constexpr std::array modeNames{"1 - Stick click (default)","2 - Grip + trigger hold","3 - Custom"};
- ImGui::SetNextItemWidth(-1);
- if(ImGui::BeginCombo("##input-mode",modeNames[static_cast<unsigned>(inputMode)-1])) {
-  for(unsigned i=0;i<modeNames.size();++i)if(ImGui::Selectable(modeNames[i],static_cast<unsigned>(inputMode)==i+1)) {
-   inputMode=static_cast<InputMode>(i+1);(void)applyInputMode(inputMode);
-  }
-  ImGui::EndCombo();
- }
- auto value=snapshotControls();bool changed=false;
- {visual::Font font(render::FontRole::Body,18);ImGui::TextWrapped("%s",inputMode==InputMode::StickClick?
-  "Click and release the right stick to open, or use ROCK's Palm binding when the ROCK setup wizard moves it. Click to select; click Cancel to close.":inputMode==InputMode::GripTriggerHold?
-  "Hold right grip + trigger for 0.50 seconds. Release to select. A held weapon's trigger-equip and the two-hand Rocky gesture take priority.":
-  "Remap the opening gesture and selection below. Your custom binding is kept when switching modes.");}
- ImGui::Dummy({0,12});
- if(inputMode==InputMode::Custom) {
- visual::caption("Selection");
- ImGui::BeginDisabled(!supportsReleaseSelection(value.binding.type));
- if(visual::button("Release to select",{245,48},value.mode==OpenMode::Hold)){value.mode=OpenMode::Hold;changed=true;}
- ImGui::EndDisabled();ImGui::SameLine();
- if(visual::button("Click to select",{245,48},value.mode==OpenMode::Press)){value.mode=OpenMode::Press;changed=true;}
- {visual::Font font(render::FontRole::Body,18);ImGui::PushTextWrapPos();ImGui::TextColored(visual::muted(),"%s",value.mode==OpenMode::Hold?
- "Keep the opening input held. Release it to select.":"Open with your binding, release its buttons, then click to select. Click Cancel to close.");ImGui::PopTextWrapPos();}
- if(isPlainStickClick(value)) {
-  visual::Font font(render::FontRole::Body,18);ImGui::PushTextWrapPos();
-  ImGui::TextColored(visual::muted(),"Click and release the stick to open. No hold time. Other held buttons or a holster zone cancel the click.");
-  ImGui::PopTextWrapPos();
- }
- ImGui::Dummy({0,12});
- const auto combo=[&](const char* label,int& index,const auto& labels) {
-  bool edited=false;ImGui::TableNextColumn();visual::caption(label);ImGui::PushID(label);ImGui::SetNextItemWidth(-1);
-  if(ImGui::BeginCombo("##value",labels[index])){for(int i=0;i<static_cast<int>(labels.size());++i)if(ImGui::Selectable(labels[i],index==i)){index=i;edited=true;}ImGui::EndCombo();}
-  ImGui::PopID();ImGui::Dummy({0,12});return edited;
- };
- if(ImGui::BeginTable("opening-binding",2,ImGuiTableFlags_SizingStretchSame)) {
-  constexpr std::array handLabels{"Primary","Off hand","Right","Left"};
-  constexpr std::array buttonLabels{"Trigger","Grip","A / X","B / Y","Thumbstick"};
-  int hand=static_cast<int>(value.binding.hand);
-  if(combo("Hand",hand,handLabels)){value.binding.hand=static_cast<Hand>(hand);changed=true;}
-  constexpr std::array activationLabels{"Press","Tap","Double tap","Hold","Long press","Release"};
-  int activation=static_cast<int>(std::find(activationTypes.begin(),activationTypes.end(),value.binding.type)-activationTypes.begin());
-  if(combo("Opening gesture",activation,activationLabels)) {
-   value.binding.type=activationTypes[activation];
-   value.binding.duration=value.binding.type==ActivationType::HoldDown?.25f:value.binding.type==ActivationType::LongPress?.6f:value.binding.type==ActivationType::DoublePress?.4f:0;
-   if(!supportsReleaseSelection(value.binding.type))value.mode=OpenMode::Press;
-   changed=true;
-  }
-  int button=static_cast<int>(std::find(buttons.begin(),buttons.end(),value.binding.button)-buttons.begin());
-  if(combo("Button",button,buttonLabels)){value.binding.button=buttons[button];changed=true;}
-  constexpr std::array modifierNames{"None","Trigger","Grip","A / X","B / Y","Thumbstick"};
-  int modifier=value.binding.modifier?1+static_cast<int>(std::find(buttons.begin(),buttons.end(),value.binding.modifier->button)-buttons.begin()):0;
-  if(combo("Modifier",modifier,modifierNames)) {if(modifier)value.binding.modifier=InputModifier{buttons[modifier-1],{}};else value.binding.modifier.reset();changed=true;}
-  if(value.binding.modifier) {
-   int modifierHand=value.binding.modifier->hand?1+static_cast<int>(*value.binding.modifier->hand):0;
-   constexpr std::array modifierHands{"Same hand","Primary","Off hand","Right","Left"};
-   if(combo("Modifier hand",modifierHand,modifierHands)){value.binding.modifier->hand=modifierHand?std::optional<Hand>(static_cast<Hand>(modifierHand-1)):std::nullopt;changed=true;}
-  }
-  ImGui::EndTable();
- }
- const auto type=value.binding.type;
- if(type==ActivationType::HoldDown || type==ActivationType::LongPress || type==ActivationType::DoublePress || type==ActivationType::Release) {
-  visual::caption(type==ActivationType::DoublePress?"Double-tap window":type==ActivationType::Release?"Maximum hold (0 = any)":"Hold time");
-  float timing=value.binding.duration>0?value.binding.duration:type==ActivationType::LongPress?.6f:type==ActivationType::DoublePress?.4f:0;
-  ImGui::SetNextItemWidth(320);if(ImGui::SliderFloat("##binding-time",&timing,0,1,"%.2f seconds")){value.binding.duration=timing;changed=true;}
- }
- if(!supportsReleaseSelection(type)){visual::Font font(render::FontRole::Body,18);ImGui::TextColored(visual::muted(),"Tap and release bindings use click-to-select.");}
- if(changed)(void)applyControls(value,!ImGui::IsAnyItemActive());
- }
- {auto& s=state();std::unique_lock lock(s.mutex,std::try_to_lock);if(lock.owns_lock()){if(s.dirty && !ImGui::IsAnyItemActive())s.save=true;visual::Font font(render::FontRole::Body,18);ImGui::TextColored(visual::muted(),"%s",s.status.c_str());}}
- ImGui::Dummy({0,24});
-}
 }

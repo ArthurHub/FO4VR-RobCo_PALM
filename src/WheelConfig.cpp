@@ -17,7 +17,7 @@ struct State {
  std::array<std::vector<Favorite>,kCategoryCount> unchosen,waiting;
  std::atomic_bool changed=false;
  std::string status="Preview — choices stay in memory";
- unsigned category{},settingsPage{};char search[128]{};
+ unsigned category{};char search[128]{};
 };
 State& state(){static State s;return s;}
 void limitSections(Model& model) {
@@ -293,16 +293,9 @@ void chooseWheelItem(std::string_view stateName,bool chosen) {
 void drawWheelSettings() {
  auto& s=state();std::unique_lock lock(s.mutex,std::try_to_lock);if(!lock.owns_lock())return;
  using namespace devui;
- ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{20,24});
- ImGui::BeginChild("palm-settings-nav",{visual::railWidth(ImGui::GetContentRegionAvail().x),0},ImGuiChildFlags_AlwaysUseWindowPadding);
- visual::caption("PALM");ImGui::Dummy({0,12});
- if(visual::navigation("Wheel sections",s.settingsPage==0))s.settingsPage=0;
- if(visual::navigation("Controls",s.settingsPage==1))s.settingsPage=1;
- if(visual::navigation("Pointer aim",s.settingsPage==2))s.settingsPage=2;
- ImGui::EndChild();ImGui::PopStyleVar();ImGui::SameLine(0,0);
+ // Controls and pointer aim are on RobCo PALM's page in Mods Config, which owns PALM.toml.
  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{26,24});
  ImGui::BeginChild("wheel-settings",{0,0},ImGuiChildFlags_AlwaysUseWindowPadding);
- if(s.settingsPage){if(s.settingsPage==1)drawControls();else drawPointerAim();ImGui::EndChild();ImGui::PopStyleVar();return;}
  SectionCatalog catalog;if(!sectionRegistry().snapshot(catalog)){ImGui::EndChild();ImGui::PopStyleVar();return;}
  const auto enabledCount=[&] {
   unsigned count=(s.prefs.configShown?1u:0u)+static_cast<unsigned>(std::count(s.prefs.enabled.begin(),s.prefs.enabled.end(),true))+(s.prefs.gesturesEnabled && gestureIntegrationAvailable()?2:0);

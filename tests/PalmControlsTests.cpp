@@ -295,32 +295,30 @@ int main(){try {
  check(!std::filesystem::exists(ini) && std::filesystem::exists(path),"PALM.ini was not replaced by PALM.toml");
  check(snapshotInputMode()==InputMode::Custom,"legacy remapping was not retained as Custom");
  check(read(path).find(R"(OpenMenu = { hand = "left", type = "press", button = "menu", modifier = { button = "grip" } })")!=std::string::npos,"PALM.ini's binding did not become a table");
+ // A preset is the binding while it is chosen; Custom's binding stays in the file for when Custom is chosen again.
+ const auto customLine="[Controls]\nMode = \"press\"\nOpenMenu = "+bindingText(loaded)+"\n";
  for(const auto mode:{InputMode::StickClick,InputMode::GripTriggerHold}) {
-  check(applyInputMode(mode) && snapshotControls()==controlsForMode(mode),"fixed input mode used custom binding");
-  check(!applyControls(loaded),"preset permitted remapping outside Custom");
-  persistControls();initializeControls(path);
-  check(snapshotInputMode()==mode && snapshotControls()==controlsForMode(mode),"selected input mode was not restored");
-  check(applyInputMode(InputMode::Custom) && snapshotControls()==loaded,"preset switching discarded custom mapping");
+  write(path,(customLine+"InputMode = "+std::to_string(static_cast<int>(mode))+"\n").c_str());
+  check(initializeControls(path).empty(),"a valid preset reported a problem");
+  check(snapshotInputMode()==mode && snapshotControls()==controlsForMode(mode),"a preset used Custom's binding");
  }
- check(!applyInputMode(static_cast<InputMode>(4)) && snapshotInputMode()==InputMode::Custom,"invalid input mode changed controls");
- check(applyControls(Controls{}) && takeControlsSaveRequest(),"edit did not queue persistence");persistControls();initializeControls(path);
- check(snapshotControls()==Controls{},"controls were not restored from disk");
+ write(path,(customLine+"InputMode = 3\n").c_str());initializeControls(path);
+ check(snapshotInputMode()==InputMode::Custom && snapshotControls()==loaded,"Custom did not use its kept binding");
+ write(path,"[Controls]\nInputMode = 3\n");initializeControls(path);
+ check(snapshotControls()==Controls{},"Custom without a binding did not use the default binding");
  check(snapshotPointerAim()==PointerAim{},"missing pointer keys did not use default calibration");
  check(std::fabs(nativePointerPitch(snapshotPointerAim().pitch[0])+45.f)<1e-4f && std::fabs(nativePointerPitch(snapshotPointerAim().pitch[1])+45.f)<1e-4f,"the default pitch did not apply over the forward baseline to both hands");
  check(nativePointerPitch(-90.f)==-160.f && nativePointerPitch(90.f)==20.f,"pitch correction range was clipped around the forward baseline");
  (void)takePointerAimChange();
  PointerAim aim;aim.pitch={-75,-68};aim.yaw={-2,4};
- check(applyPointerAim(aim,false) && !takePointerAimChange(),"dragging the calibration slider changed live aim before release");
- check(applyPointerAim(aim) && takePointerAimChange() && takeControlsSaveRequest(),"released calibration edit did not apply and queue its save");
- persistControls();initializeControls(path);
- check(snapshotPointerAim()==aim && snapshotControls()==Controls{},"per-hand calibration did not persist independently of bindings");
- auto invalidAim=aim;invalidAim.pitch[0]=91;
- check(!applyPointerAim(invalidAim) && snapshotPointerAim()==aim,"out-of-range calibration changed pointer settings");
- invalidAim=aim;invalidAim.yaw[1]=std::numeric_limits<float>::quiet_NaN();
- check(!applyPointerAim(invalidAim),"non-finite calibration was accepted");
- write(path,"[Pointer]\nLeftPitchDegrees = 'invalid'\nRightPitchDegrees = -68.0\n");initializeControls(path);
+ write(path,"[Controls]\nInputMode = 3\n[Pointer]\nLeftPitchDegrees = -75.0\nRightPitchDegrees = -68.0\nLeftYawDegrees = -2.0\nRightYawDegrees = 4.0\n");
+ check(initializeControls(path).empty() && takePointerAimChange(),"a saved pointer aim was not applied");
+ check(snapshotPointerAim()==aim && snapshotControls()==Controls{},"per-hand calibration did not read independently of bindings");
+ write(path,"[Pointer]\nLeftPitchDegrees = 'invalid'\nRightPitchDegrees = -68.0\n");
+ (void)initializeControls(path); // The store reports a value of another type itself, as PALM loads.
  check(snapshotPointerAim().pitch[0]==PointerAim{}.pitch[0] && snapshotPointerAim().pitch[1]==aim.pitch[1],"invalid pointer angle did not use its default independently");
- write(path,"[Pointer]\nLeftPitchDegrees = 95.0\n");initializeControls(path);
+ write(path,"[Pointer]\nLeftPitchDegrees = 95.0\n");
+ check(!initializeControls(path).empty(),"an out-of-range pointer angle was not reported");
  check(snapshotPointerAim().pitch[0]==PointerAim{}.pitch[0],"an out-of-range saved angle was used");
  std::filesystem::remove(path);initializeControls(path);
  check(snapshotInputMode()==InputMode::StickClick && snapshotControls()==Controls{} && snapshotPointerAim()==PointerAim{} && std::filesystem::exists(path),"first run did not create mode 1 and pointer defaults");

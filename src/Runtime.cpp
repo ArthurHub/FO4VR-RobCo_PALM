@@ -482,7 +482,6 @@ void RPSUI_CALL onFrame(const rpsui::api::input::Frame* frame,void*) noexcept {
   if(!frame)return;auto& s=state();
   serviceModsConfigRestore(frame->seconds);
   if(takePointerAimChange() && !publishPointerAim())spdlog::error("PALM pointer aim update rejected by UI framework");
-  if(takeControlsSaveRequest())if(const auto* tasks=F4SE::GetTaskInterface())tasks->AddTask([]{persistControls();});
   InputMode inputMode;
   const auto controls=snapshotControls(&inputMode);
   const bool leftHanded=frame->leftHanded!=0;
@@ -743,7 +742,7 @@ bool startRuntime() {
  PWSTR documents{};
  if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents,0,nullptr,&documents))) {
   const auto path=std::filesystem::path(documents)/"My Games"/"Fallout4VR"/"Mods_Config"/"RobCo_PALM"/"PALM.toml";
-  CoTaskMemFree(documents);initializeControls(path);if(takeControlsSaveRequest())persistControls();
+  CoTaskMemFree(documents);for(const auto& problem:initializeControls(path))spdlog::warn("{}",problem);
   spdlog::info("PALM settings path: {}",path.string());
  }else {spdlog::error("PALM Documents folder unavailable");return false;}
  s.controls=snapshotControls();setGestureIntegrationAvailable(false);

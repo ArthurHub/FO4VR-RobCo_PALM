@@ -127,25 +127,16 @@ bool parseControls(std::string_view mode,std::string_view binding,Controls& out,
 std::string bindingText(const Controls& controls);
 Controls snapshotControls(InputMode* inputMode=nullptr);
 InputMode snapshotInputMode();
-bool applyInputMode(InputMode mode);
 // PALM.toml at path through RPS Framework's settings store, loaded at startup:
 // organized, created when missing, and PALM.ini beside it migrated once.
 std::unique_ptr<RPS::Settings::Store> openPalmSettings(const std::filesystem::path& path);
-// Loads controls and pointer aim from PALM.toml at path; an empty path keeps
-// them in memory only (the desktop preview).
-void initializeControls(const std::filesystem::path& path);
+std::vector<std::string> initializeControls(const std::filesystem::path& path);
 std::vector<std::string> reloadControls();
 int logLevel(const RPS::Settings::Store& store);
 int snapshotLogLevel();
 bool snapshotDeveloperEnabled();
-bool applyControls(const Controls& controls,bool queueSave=true); // Memory only; explicit save is queued for the game task.
-bool takeControlsSaveRequest();
-void persistControls();
-void drawControls();
 PointerAim snapshotPointerAim();
-bool applyPointerAim(const PointerAim& aim,bool commit=true);
 bool takePointerAimChange();
-void drawPointerAim();
 void setGestureIntegrationAvailable(bool available);
 bool gestureIntegrationAvailable();
 }

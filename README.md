@@ -25,7 +25,7 @@ ROCK 1.0.4 or newer adds physical item handling; hand gestures also need FRIK 0.
 
 **Mode 2:** hold **right trigger + grab** for **0.50 seconds** to open the wheel, point, and release to select. Aim at the center/Cancel area and release to cancel.
 
-Choose your items on RobCo PALM's **Wheel** page in Mods Config FO4 VR, on the page of each part under it, or in **Config → Wheel items**. Select either preset or **Mode 3 — Custom** in **Config → Wheel settings → Controls**. Custom mode unlocks remapping and the choice between **Release to select** and **Click to select**; its binding is retained when you switch back to a preset.
+Choose your items on RobCo PALM's **Wheel** page in Mods Config FO4 VR, on the page of each part under it, or in **Config → Wheel items**. Select either preset or **Mode 3 — Custom** on the **Controls** page of RobCo PALM in Mods Config FO4 VR. Custom mode unlocks remapping and the choice between **Release to select** and **Click to select**; its binding is retained when you switch back to a preset.
 
 In **Click to select**, release the opening buttons before selecting with the pointing hand's trigger or A/X. The wheel stays open until you click **Cancel** or enter Config. Opening bindings support press, tap, double tap, hold, long press, and release, with an optional modifier on either hand. Touch and axis inputs are excluded; thumbstick click is supported. Tap and release bindings use click-to-select.
 
