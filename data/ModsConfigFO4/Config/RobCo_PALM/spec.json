@@ -64,7 +64,7 @@
         },
         {
           "type": "text",
-          "text": "<font color='#10FA78'>Choosing items:</font> select Config on the wheel, then Wheel items. Wheel settings chooses which sections the ring shows.",
+          "text": "<font color='#10FA78'>Choosing items:</font> the Wheel page chooses what the ring shows, and each part on it has its own page of items under it.",
           "html": true
         },
         {
@@ -110,11 +110,48 @@
   ],
   "pages": [
     {
-      "id": "wheelSections",
-      "pageDisplayName": "Wheel sections",
-      "help": "Which sections the ring shows. Changes show on the wheel as you make them.",
+      "id": "wheel",
+      "pageDisplayName": "Wheel",
+      "help": "What the ring shows, and below it the items of each part on it. Changes show on the wheel as you make them.",
       "applies": "live",
-      "contentFromClientCallback": true
+      "contentFromClientCallback": true,
+      "pages": [
+        {
+          "id": "items.weapons",
+          "pageDisplayName": "Weapons",
+          "help": "Up to eight weapons on the wheel. Shown while Weapons is on the ring.",
+          "visibleWhen": { "clientState": "section.weapons", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.armor",
+          "pageDisplayName": "Armor",
+          "help": "Up to eight armor on the wheel. Shown while Armor is on the ring.",
+          "visibleWhen": { "clientState": "section.armor", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.aid",
+          "pageDisplayName": "Aid",
+          "help": "Up to eight aid items on the wheel. Shown while Aid is on the ring.",
+          "visibleWhen": { "clientState": "section.aid", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.food",
+          "pageDisplayName": "Food",
+          "help": "Up to eight food items on the wheel. Shown while Food is on the ring.",
+          "visibleWhen": { "clientState": "section.food", "equals": true },
+          "contentFromClientCallback": true
+        },
+        {
+          "id": "items.grenades",
+          "pageDisplayName": "Grenades",
+          "help": "Up to eight grenades on the wheel. Shown while Grenades is on the ring.",
+          "visibleWhen": { "clientState": "section.grenades", "equals": true },
+          "contentFromClientCallback": true
+        }
+      ]
     },
     {
       "id": "controls",

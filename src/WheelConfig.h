@@ -15,12 +15,17 @@ std::size_t publishWheelInventory(const Model& inventory);
 bool addWheelFavorite(Category category,const Item& item,unsigned slot,const char*& message);
 Model selectedWheelInventory(const Model& inventory);
 bool takeWheelConfigChange();
-// Mods Config FO4 VR's Wheel sections page (page wheelSections of PALM's config spec): the JSON text of its content
-// array, and the client states its switchers are kept in: section.<category>, section.gestures and section.mod.<id>.
-struct WheelSectionsContent {std::string json;std::vector<std::string> states;};
-WheelSectionsContent wheelSectionsContent();
+// A dynamic page of PALM's config spec in Mods Config FO4 VR: the JSON text of its content array, and the client
+// states its switchers are kept in. The Wheel page (page wheel) names them section.<category>, section.gestures,
+// section.config and section.mod.<id>; its sub-pages of items (pages items.<category>) item.<category>.<key>.
+struct WheelPageContent {std::string json;std::vector<std::string> states;};
+WheelPageContent wheelSectionsContent();
 std::optional<bool> wheelSectionShown(std::string_view stateName);
 void showWheelSection(std::string_view stateName,bool shown);
+std::optional<Category> wheelItemsPageCategory(std::string_view pageId);
+WheelPageContent wheelItemsContent(Category category);
+std::optional<bool> wheelItemChosen(std::string_view stateName);
+void chooseWheelItem(std::string_view stateName,bool chosen);
 void refreshWheelSections(Model& model);
 void drawWheelConfig();
 void drawWheelSettings();

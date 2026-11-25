@@ -6,7 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 
-// Mods Config's Wheel sections page: its rows, and the client states that keep them.
+// Mods Config's Wheel page and its pages of items: their rows, and the client states that keep them.
 namespace {
 void check(bool ok,const char* what){if(!ok)throw std::runtime_error(what);}
 const nlohmann::json* findRow(const nlohmann::json& rows,std::string_view id) {
@@ -60,6 +60,43 @@ int main(){try {
  setGestureIntegrationAvailable(false);
  const auto withoutGestures=nlohmann::json::parse(wheelSectionsContent().json);
  check(!findRow(withoutGestures[2]["content"],"section.gestures") && withoutGestures.size()==3,"Gestures is listed without ROCK and FRIK");
- std::cout<<"Wheel sections page rows and states passed\n";
+
+ // Items: an Aid page with a carried choice, a choice no longer carried and carried items to choose.
+ constexpr auto aid=static_cast<unsigned>(Category::Aid);
+ Preferences items;
+ check(items.place(aid,{"a|1","Stimpak"},2) && items.place(aid,{"a|9","Old Aid"},5),"the fixture choices did not place");
+ restoreWheelPreferences(items);
+ Model inventory;
+ for(unsigned i=1;i<=8;++i)inventory.items[aid].push_back({i,i==1?"Stimpak":"Aid "+std::to_string(i),i,false,"a|"+std::to_string(i)});
+ (void)publishWheelInventory(inventory);
+ check(wheelItemsPageCategory("items.aid")==Category::Aid && !wheelItemsPageCategory("wheel"),"a Wheel items page id does not name its category");
+ const auto itemsPage=wheelItemsContent(Category::Aid);
+ const auto aidRows=nlohmann::json::parse(itemsPage.json);
+ const auto& aidSection=aidRows.back();
+ check(aidRows[0]["action"]["function"]=="openWheel" && aidSection["maxOn"]==kSlots,"the Aid page is not Open the wheel and a section of at most eight");
+ check(aidSection["content"].size()==9 && itemsPage.states.size()==9,"the Aid page does not list the choice not carried and the eight carried items");
+ check(aidSection["content"][0]["id"]=="item.aid.a|9" && aidSection["content"][0]["text"]=="Old Aid","the choice not carried does not come first");
+ const auto* stimpak=findRow(aidSection["content"],"item.aid.a|1");
+ check(stimpak && (*stimpak)["text"]=="Stimpak (1)" && (*stimpak)["default"]==false,"a carried item does not show its count");
+ check(wheelItemChosen("item.aid.a|1")==true && wheelItemChosen("item.aid.a|2")==false && !wheelItemChosen("item.nothing.a|1"),"an item state does not read the wheel");
+ const auto slotOf=[&](std::string_view key) {
+  const auto prefs=snapshotWheelPreferences();const auto& list=prefs.slots[aid];
+  const auto found=std::find_if(list.begin(),list.end(),[&](const Favorite& f){return f.key==key;});
+  return found==list.end()?kSlots:found->slot;
+ };
+ chooseWheelItem("item.aid.a|1",false);
+ check(wheelItemChosen("item.aid.a|1")==false,"turning an item off left it on the wheel");
+ chooseWheelItem("item.aid.a|2",true);
+ check(slotOf("a|2")==0,"a new choice did not take the lowest free slot");
+ chooseWheelItem("item.aid.a|1",true);
+ check(slotOf("a|1")==2,"an item turned off and on again lost its slot");
+ for(unsigned i=3;i<=7;++i)chooseWheelItem("item.aid.a|"+std::to_string(i),true);
+ check(snapshotWheelPreferences().slots[aid].size()==kSlots,"the Aid ring did not fill");
+ // A Discard can turn a choice on before it turns another off: the choice waits for that slot.
+ chooseWheelItem("item.aid.a|8",true);
+ check(wheelItemChosen("item.aid.a|8")==true && slotOf("a|8")==kSlots,"a choice made while the ring is full did not wait");
+ chooseWheelItem("item.aid.a|9",false);
+ check(slotOf("a|8")==5 && !wheelItemChosen("item.aid.a|9").value(),"the waiting choice did not take the freed slot");
+ std::cout<<"Wheel page and pages of items rows and states passed\n";
  return 0;
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

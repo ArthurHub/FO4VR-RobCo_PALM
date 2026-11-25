@@ -5,6 +5,7 @@
 #include "Runtime.h"
 #include "SettingsMenu.h"
 #include "WheelConfig.h"
+#include "Inventory.h"
 #include <ModsConfigFO4Api.h>
 
 namespace wheel::mods_config_client {
@@ -55,19 +56,39 @@ FunctionResult openSettings(const Params&) {
  return {true,{}};
 }
 
+// The Wheel page's sub-pages of items, one per category, in the config spec's order.
+constexpr std::array<const char*,5> kItemsPages{"items.weapons","items.armor","items.aid","items.food","items.grenades"};
+constexpr const char* kLoadGameFirst=R"([{"type":"text","text":"Load a game first: each save keeps its own wheel."}])";
+
 /**
- * The Wheel sections page's rows, with a client state for each switcher: its getter reads the wheel's preferences and
- * its setter shows or hides the section, for each live preview, Discard and Save. The co-save keeps them, so outside
- * a loaded game the page only says to load one.
+ * Gives a dynamic page's rows, adding the client state of each switcher: its getter reads the wheel's preferences and
+ * its setter applies the value, for each live preview, Discard and Save. A state added before keeps its first.
  */
-std::optional<std::string> wheelSectionsPage() {
- if(!gameSessionReady())return std::string(R"([{"type":"text","text":"Load a game first: each save keeps its own wheel sections."}])");
- auto content=wheelSectionsContent();
+std::string pageRows(WheelPageContent content,std::optional<bool>(*read)(std::string_view),void(*write)(std::string_view,bool)) {
  auto& client=ModsConfigFO4Client::get();
  for(const auto& name:content.states)
-  client.addState(name,[name]{const auto shown=wheelSectionShown(name);return shown?std::optional<Value>(*shown):std::nullopt;},
-   [name](const Value& value){if(const auto* shown=std::get_if<bool>(&value))showWheelSection(name,*shown);});
+  client.addState(name,[name,read]{const auto value=read(name);return value?std::optional<Value>(*value):std::nullopt;},
+   [name,write](const Value& value){if(const auto* on=std::get_if<bool>(&value))write(name,*on);});
  return std::move(content.json);
+}
+
+/**
+ * The Wheel page's rows, what the ring shows. The co-save keeps them, so outside a loaded game the page only says to load one.
+ */
+std::optional<std::string> wheelSectionsPage() {
+ if(!gameSessionReady())return std::string(kLoadGameFirst);
+ return pageRows(wheelSectionsContent(),&wheelSectionShown,&showWheelSection);
+}
+
+/**
+ * A category's page of items under the Wheel page, from the inventory read as the page is shown: Mods Config asks on the game's main thread,
+ * where the inventory is read. Outside a loaded game the page only says to load one.
+ */
+std::optional<std::string> wheelItemsPage(Category category) {
+ if(!gameSessionReady())return std::string(kLoadGameFirst);
+ try{(void)readInventory();}
+ catch(...){spdlog::error("PALM could not read the inventory for Mods Config's pages of wheel items");}
+ return pageRows(wheelItemsContent(category),&wheelItemChosen,&chooseWheelItem);
 }
 
 /**
@@ -87,7 +108,9 @@ void connect() noexcept {
   client.addState("modVersion",[]{return std::optional<Value>(std::string(PALM_VERSION));});
   client.addFunction("openWheel",&openWheel);
   client.addFunction("openSettings",&openSettings);
-  client.addPageContent("wheelSections",&wheelSectionsPage);
+  client.addPageContent("wheel",&wheelSectionsPage);
+  for(const char* page:kItemsPages)
+   if(const auto category=wheelItemsPageCategory(page))client.addPageContent(page,[category=*category]{return wheelItemsPage(category);});
   client.subscribeToSaves(&onSaved);
   if(const auto* messaging=F4SE::GetMessagingInterface())
    (void)messaging->RegisterListener(&onModsConfigMessage,::mods_config::api::MODS_CONFIG_FO4_F4SE_NAME);

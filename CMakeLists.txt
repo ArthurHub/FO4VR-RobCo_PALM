@@ -151,9 +151,9 @@ target_link_libraries(PalmControlsTests PRIVATE palm_preview)
 target_compile_definitions(PalmControlsTests PRIVATE PALM_CONTROLS_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/palm-controls-test")
 add_test(NAME Wheel.Controls COMMAND PalmControlsTests)
 
-add_executable(WheelSectionsPageTests tests/WheelSectionsPageTests.cpp preview/PreviewFonts.cpp)
-target_link_libraries(WheelSectionsPageTests PRIVATE palm_preview)
-add_test(NAME Wheel.SectionsPage COMMAND WheelSectionsPageTests)
+add_executable(WheelPagesTests tests/WheelPagesTests.cpp preview/PreviewFonts.cpp)
+target_link_libraries(WheelPagesTests PRIVATE palm_preview)
+add_test(NAME Wheel.ModsConfigPages COMMAND WheelPagesTests)
 
 add_executable(PALMCapture preview/Capture.cpp preview/PreviewFonts.cpp src/IconResources.rc)
 target_link_libraries(PALMCapture PRIVATE palm_preview wheel_imgui_dx11 windowscodecs ole32)

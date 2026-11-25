@@ -12,6 +12,9 @@ namespace wheel {
 namespace {
 struct State {
  std::mutex mutex;Preferences prefs;Model inventory;
+ // Per category, the choices Mods Config turned off, with their ring slots, and those it turned on while every slot
+ // was taken: a Discard puts each back where it was, in whatever order Mods Config gives the values.
+ std::array<std::vector<Favorite>,kCategoryCount> unchosen,waiting;
  std::atomic_bool changed=false;
  std::string status="Preview — choices stay in memory";
  unsigned category{},settingsPage{};char search[128]{};
@@ -39,6 +42,8 @@ Preferences snapshotWheelPreferences() {
 void restoreWheelPreferences(Preferences prefs) {
  auto& s=state();std::scoped_lock lock(s.mutex);
  s.prefs=std::move(prefs);s.inventory={};s.changed=false;s.category=0;s.search[0]='\0';
+ for(auto& list:s.unchosen)list.clear();
+ for(auto& list:s.waiting)list.clear();
  s.status="Saved with your game";
 }
 std::size_t publishWheelInventory(const Model& inventory){
@@ -85,32 +90,58 @@ void refreshWheelSections(Model& model) {
 }
 bool takeWheelConfigChange(){return state().changed.exchange(false);}
 namespace {
-// The item categories in the order the page lists them, with the names of their client states.
-constexpr std::array<std::pair<Category,std::string_view>,kCategoryCount> kPageCategories{{
- {Category::Weapons,"section.weapons"},{Category::Armor,"section.armor"},{Category::Aid,"section.aid"},
- {Category::Food,"section.food"},{Category::Grenades,"section.grenades"}}};
+// The item categories in the order the pages list them, by the name their client states and pages of items use.
+struct PageCategory {Category category;std::string_view slug;};
+constexpr std::array<PageCategory,kCategoryCount> kPageCategories{{
+ {Category::Weapons,"weapons"},{Category::Armor,"armor"},{Category::Aid,"aid"},{Category::Food,"food"},{Category::Grenades,"grenades"}}};
+constexpr std::string_view kSectionStatePrefix="section.",kItemStatePrefix="item.";
 constexpr std::string_view kGesturesState="section.gestures",kConfigState="section.config",kModStatePrefix="section.mod.";
 std::string titleCase(std::string_view upper) {
  std::string result(upper);
  for(std::size_t i=1;i<result.size();++i)if(result[i]>='A' && result[i]<='Z')result[i]=static_cast<char>(result[i]+32);
  return result;
 }
+const PageCategory* pageCategory(std::string_view slug) {
+ for(const auto& category:kPageCategories)if(category.slug==slug)return &category;
+ return nullptr;
+}
+nlohmann::json switcherRow(std::vector<std::string>& states,std::string_view stateName,std::string_view text,std::string_view help,bool fallback) {
+ states.emplace_back(stateName);
+ return nlohmann::json{{"id",stateName},{"type","switcher"},{"valueType","bool"},{"text",text},{"help",help},
+  {"default",fallback},{"storage",{{"clientState",stateName}}}};
+}
+nlohmann::json openWheelButton() {
+ return {{"type","button"},{"text","Open the wheel"},{"buttonText","Open"},{"icon","window"},
+  {"help","Minimizes this menu and opens the wheel, to see your changes on it. This menu comes back when the wheel closes."},
+  {"action",{{"type","CallNativeFunction"},{"function","openWheel"}}}};
+}
+// An item state's category and key: item.<category>.<key>.
+std::optional<std::pair<Category,std::string_view>> itemState(std::string_view stateName) {
+ if(!stateName.starts_with(kItemStatePrefix))return std::nullopt;
+ stateName.remove_prefix(kItemStatePrefix.size());
+ const auto dot=stateName.find('.');if(dot==std::string_view::npos || dot+1==stateName.size())return std::nullopt;
+ const auto* category=pageCategory(stateName.substr(0,dot));if(!category)return std::nullopt;
+ return std::pair{category->category,stateName.substr(dot+1)};
+}
+// Places a choice back at its earlier slot while it is free, else at the lowest free one.
+bool placeChoice(Preferences& prefs,unsigned category,const Favorite& choice) {
+ return prefs.place(category,choice,choice.slot) || prefs.select(category,choice,true);
+}
 }
 /**
- * Mods Config's Wheel sections rows: Open the wheel, then a section limited to the ring's places with the categories,
+ * Mods Config's Wheel page rows: Open the wheel, then a section limited to the ring's places with the categories,
  * Gestures (two places, while ROCK and FRIK serve gestures), the registered mod sections and Config, then the shown
  * sections whose mod has not registered them, which take no place, so the player can forget them.
  */
-WheelSectionsContent wheelSectionsContent() {
+WheelPageContent wheelSectionsContent() {
  auto& s=state();std::scoped_lock lock(s.mutex);
- WheelSectionsContent result;
+ WheelPageContent result;
  const auto row=[&](std::string_view stateName,std::string_view text,std::string_view help,bool fallback) {
-  result.states.emplace_back(stateName);
-  return nlohmann::json{{"id",stateName},{"type","switcher"},{"valueType","bool"},{"text",text},{"help",help},
-   {"default",fallback},{"storage",{{"clientState",stateName}}}};
+  return switcherRow(result.states,stateName,text,help,fallback);
  };
  auto ring=nlohmann::json::array();
- for(const auto& [category,stateName]:kPageCategories)ring.push_back(row(stateName,titleCase(categoryName(category)),"Inventory items you choose on Wheel items.",true));
+ for(const auto& [category,slug]:kPageCategories)
+  ring.push_back(row(std::string(kSectionStatePrefix)+std::string(slug),titleCase(categoryName(category)),"Its items are on its own page under this one, shown while it is on.",true));
  if(gestureIntegrationAvailable()) {
   auto gestures=row(kGesturesState,"Gestures","The left and right hand menus of ROCK and FRIK. Takes two places.",false);
   gestures["countsAs"]=2;ring.push_back(std::move(gestures));
@@ -123,9 +154,7 @@ WheelSectionsContent wheelSectionsContent() {
  }
  ring.push_back(row(kConfigState,"Config","Opens PALM's settings from the wheel. Without it, open them from Mods Config FO4 VR. The ring keeps it when nothing else is shown.",true));
  auto content=nlohmann::json::array();
- content.push_back({{"type","button"},{"text","Open the wheel"},{"buttonText","Open"},{"icon","window"},
-  {"help","Minimizes this menu and opens the wheel, to see your changes on it. This menu comes back when the wheel closes."},
-  {"action",{{"type","CallNativeFunction"},{"function","openWheel"}}}});
+ content.push_back(openWheelButton());
  content.push_back({{"type","text"},{"text",std::format("The ring has room for {} sections, Config with them; Cancel is in its center. Hiding a section keeps its items.",palm::api::menu::kMaxVisibleEntries)}});
  content.push_back({{"type","section"},{"text","On the ring"},{"maxOn",palm::api::menu::kMaxVisibleEntries},{"content",std::move(ring)}});
  auto waiting=nlohmann::json::array();
@@ -139,18 +168,19 @@ WheelSectionsContent wheelSectionsContent() {
  return result;
 }
 /**
- * Whether the wheel shows the section of a Wheel sections client state; none for a name that is not one.
+ * Whether the wheel shows the section of a Wheel page client state; none for a name that is not one.
  */
 std::optional<bool> wheelSectionShown(std::string_view stateName) {
  auto& s=state();std::scoped_lock lock(s.mutex);
  if(stateName==kGesturesState)return s.prefs.gesturesEnabled;
  if(stateName==kConfigState)return s.prefs.configShown;
  if(stateName.starts_with(kModStatePrefix))return s.prefs.sectionEnabled(stateName.substr(kModStatePrefix.size()));
- for(const auto& [category,name]:kPageCategories)if(stateName==name)return s.prefs.enabled[static_cast<unsigned>(category)];
+ if(stateName.starts_with(kSectionStatePrefix))
+  if(const auto* category=pageCategory(stateName.substr(kSectionStatePrefix.size())))return s.prefs.enabled[static_cast<unsigned>(category->category)];
  return std::nullopt;
 }
 /**
- * Shows or hides the section of a Wheel sections client state, as Mods Config previews, discards and saves it. Mods
+ * Shows or hides the section of a Wheel page client state, as Mods Config previews, discards and saves it. Mods
  * Config already holds the ring's limit, and the wheel fits what does not, so a mod section is added without it.
  */
 void showWheelSection(std::string_view stateName,bool shown) {
@@ -159,10 +189,106 @@ void showWheelSection(std::string_view stateName,bool shown) {
  if(stateName==kGesturesState){changed=s.prefs.gesturesEnabled!=shown;s.prefs.gesturesEnabled=shown;}
  else if(stateName==kConfigState){changed=s.prefs.configShown!=shown;s.prefs.configShown=shown;}
  else if(stateName.starts_with(kModStatePrefix))changed=s.prefs.setSectionEnabled(stateName.substr(kModStatePrefix.size()),shown,0);
- else for(const auto& [category,name]:kPageCategories)if(stateName==name) {
-  auto& enabled=s.prefs.enabled[static_cast<unsigned>(category)];changed=enabled!=shown;enabled=shown;
- }
+ else if(stateName.starts_with(kSectionStatePrefix))
+  if(const auto* category=pageCategory(stateName.substr(kSectionStatePrefix.size()))) {
+   auto& enabled=s.prefs.enabled[static_cast<unsigned>(category->category)];changed=enabled!=shown;enabled=shown;
+  }
  if(changed)s.changed=true;
+}
+/**
+ * The category of a page of items under the Wheel page, by the page's id (items.<category>); none for another page.
+ */
+std::optional<Category> wheelItemsPageCategory(std::string_view pageId) {
+ constexpr std::string_view prefix="items.";
+ if(!pageId.starts_with(prefix))return std::nullopt;
+ const auto* category=pageCategory(pageId.substr(prefix.size()));
+ return category?std::optional<Category>(category->category):std::nullopt;
+}
+/**
+ * Mods Config's rows of a category's page of items, from the inventory PALM read last: Open the wheel, notes, then a
+ * section of at most eight on with a switcher for each saved choice PALM does not see carried (it keeps its slot) and
+ * for each carried item. Each is kept in the client state item.<category>.<key>. A category with nothing to choose
+ * says so instead of an empty section, which Mods Config refuses.
+ */
+WheelPageContent wheelItemsContent(Category category) {
+ auto& s=state();std::scoped_lock lock(s.mutex);
+ WheelPageContent result;
+ const auto c=static_cast<unsigned>(category);
+ const auto page=std::find_if(kPageCategories.begin(),kPageCategories.end(),[&](const auto& entry){return entry.category==category;});
+ const auto name=titleCase(categoryName(category));
+ const auto stateOf=[&](std::string_view key){return std::string(kItemStatePrefix)+std::string(page->slug)+"."+std::string(key);};
+ const bool equipment=isEquipment(category),namesUnavailable=equipment && !s.inventory.equipmentNamesAvailable;
+ const auto& carried=s.inventory.items[c];
+ auto rows=nlohmann::json::array();
+ std::vector<std::string_view> listed;
+ const auto add=[&](std::string_view key,std::string_view text,std::string_view help) {
+  if(key.empty() || std::find(listed.begin(),listed.end(),key)!=listed.end())return;
+  listed.push_back(key);rows.push_back(switcherRow(result.states,stateOf(key),text,help,false));
+ };
+ std::vector<Favorite> saved=s.prefs.slots[c];
+ saved.insert(saved.end(),s.waiting[c].begin(),s.waiting[c].end());
+ std::sort(saved.begin(),saved.end(),[](const Favorite& a,const Favorite& b){return a.slot<b.slot;});
+ for(const auto& choice:saved)
+  if(std::none_of(carried.begin(),carried.end(),[&](const Item& item){return item.key==choice.key;}))
+   add(choice.key,choice.name,namesUnavailable?"Equipment is unavailable in this game session; the choice keeps its place.":
+    "Not carried. It keeps its place on the ring until you turn it off.");
+ for(const auto& item:carried) {
+  if(item.name.empty())continue;
+  if(equipment)add(item.key,item.equipped?std::format("{} (equipped)",item.name):item.name,item.equipped?"Equipped.":"In your inventory.");
+  else add(item.key,std::format("{} ({})",item.name,item.count),std::format("Carried: {}.",item.count));
+ }
+ auto content=nlohmann::json::array();
+ content.push_back(openWheelButton());
+ content.push_back({{"type","text"},{"text",std::format("Choose up to {} items for {}. A new choice takes the lowest free place on its ring.",kSlots,name)}});
+ if(namesUnavailable)content.push_back({{"type","text"},{"text","Equipment names are unavailable in this game session. Your saved choices are kept."}});
+ if(!s.inventory.status.empty())content.push_back({{"type","text"},{"text",s.inventory.status}});
+ if(rows.empty())content.push_back({{"type","text"},{"text",std::format("Nothing to choose: carry an item of {} first.",name)}});
+ else content.push_back({{"type","section"},{"text",name},{"maxOn",kSlots},{"content",std::move(rows)}});
+ result.json=content.dump();
+ return result;
+}
+/**
+ * Whether an item client state's item is on the wheel, or waits for a free slot; none for a name that is not one.
+ */
+std::optional<bool> wheelItemChosen(std::string_view stateName) {
+ const auto parsed=itemState(stateName);if(!parsed)return std::nullopt;
+ auto& s=state();std::scoped_lock lock(s.mutex);
+ const auto c=static_cast<unsigned>(parsed->first);const auto key=parsed->second;
+ const auto has=[&](const std::vector<Favorite>& list){return std::any_of(list.begin(),list.end(),[&](const Favorite& f){return f.key==key;});};
+ return has(s.prefs.slots[c]) || has(s.waiting[c]);
+}
+/**
+ * Puts an item client state's item on the wheel or takes it off, as Mods Config previews, discards and saves it.
+ * An item taken off keeps its slot to come back to; one put on while every slot is taken waits for the next free one,
+ * since a Discard can turn a choice on before it turns another off. An item PALM neither sees nor had is ignored.
+ */
+void chooseWheelItem(std::string_view stateName,bool chosen) {
+ const auto parsed=itemState(stateName);if(!parsed)return;
+ auto& s=state();std::scoped_lock lock(s.mutex);
+ const auto c=static_cast<unsigned>(parsed->first);const std::string key(parsed->second);
+ auto& slots=s.prefs.slots[c];auto& unchosen=s.unchosen[c];auto& waiting=s.waiting[c];
+ const auto byKey=[&](const Favorite& f){return f.key==key;};
+ const auto onWheel=std::find_if(slots.begin(),slots.end(),byKey);
+ const auto queued=std::find_if(waiting.begin(),waiting.end(),byKey);
+ if(!chosen) {
+  if(queued!=waiting.end()){waiting.erase(queued);return;}
+  if(onWheel==slots.end())return;
+  std::erase_if(unchosen,byKey);unchosen.push_back(*onWheel);slots.erase(onWheel);
+  // The slot it freed takes the first choice waiting for one.
+  if(!waiting.empty() && placeChoice(s.prefs,c,waiting.front()))waiting.erase(waiting.begin());
+  s.changed=true;return;
+ }
+ if(onWheel!=slots.end() || queued!=waiting.end())return;
+ Favorite choice;
+ if(const auto earlier=std::find_if(unchosen.begin(),unchosen.end(),byKey);earlier!=unchosen.end()){choice=*earlier;unchosen.erase(earlier);}
+ else {
+  const auto& carried=s.inventory.items[c];
+  const auto item=std::find_if(carried.begin(),carried.end(),[&](const Item& i){return i.key==key;});
+  if(item==carried.end())return;
+  choice={key,item->name,kSlots};
+ }
+ if(placeChoice(s.prefs,c,choice))s.changed=true;
+ else waiting.push_back(std::move(choice));
 }
 void drawWheelSettings() {
  auto& s=state();std::unique_lock lock(s.mutex,std::try_to_lock);if(!lock.owns_lock())return;
