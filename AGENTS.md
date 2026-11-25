@@ -2,7 +2,7 @@
 
 RobCo PALM is the wheel menu for the RPS mods. Its Config opens RPS UI's settings menu, where PALM adds its own pages. Build target and F4SE registration `RobCoPALM`, DLL `wheelmenu.dll`, log `RobCoPALM.log`, settings `PALM.toml` in `Documents/My Games/Fallout4VR/Mods_Config/RobCo_PALM/`.
 
-- Build with `cmake --preset custom-fast`, then `cmake --build build-fast --config Release --target RobCoPALM`. Tests: `cmake --build build-fast --config Release --target build_tests`, then `ctest --test-dir build-fast -C Release --output-on-failure`. Deploys `wheelmenu.dll` and its PDB only to `F4SE/Plugins` under the mod folder set by `COPY_PLUGIN_BASE_PATH` in `CMakeUserPresets.json`.
+- Build with `cmake --preset custom-fast`, then `cmake --build build-fast --config Release --target RobCoPALM`. Tests: `cmake --build build-fast --config Release --target build_tests`, then `ctest --test-dir build-fast -C Release --output-on-failure`. Deploys `wheelmenu.dll` and its PDB to `F4SE/Plugins`, and `data/` (the game's `Data` tree: PALM's Mods Config spec) to the root of the mod folder set by `COPY_PLUGIN_BASE_PATH` in `CMakeUserPresets.json`. A release archive carries both.
 
 ## Drawing
 
@@ -13,6 +13,7 @@ RobCo PALM is the wheel menu for the RPS mods. Its Config opens RPS UI's setting
 
 - The Spawner and the Console belong to RPS UI Framework's settings menu (its `src/settings_menu/`), which also shows the pages mods add. Each mod's settings are on its own page in Mods Config FO4 VR; PALM's wheel pages stay in this menu. PALM's Config opens that menu at the wheel's pose through the SettingsMenu table and refreshes the wheel's inventory when the menu's `closedCount` changes.
 - PALM's own settings are `PALM.toml` through RPS Framework's settings store (`RPS::Settings`, `openPalmSettings` in `src/PalmControls.cpp`); its first open migrates `PALM.ini` once and deletes it.
+- Mods Config FO4 VR edits `PALM.toml` on PALM's page, `data/ModsConfigFO4/Config/RobCo_PALM/spec.json` (modName `RobCoPALM`). `src/ModsConfigClient.cpp` connects at F4SE's kPostLoad, gives the version line and reads `PALM.toml` again after each Save. `external/ModsConfigFO4/ModsConfigFO4Api.h` is Mods Config's client header, copied as is: refresh it, never edit it. A key the spec edits keeps its table, key and value form in `PALM.toml`.
 - Item and gesture integration use ROCK when it is loaded; without it, PALM keeps its standalone RPS UI behaviour. A loaded ROCK that does not serve the ROCK API PALM was built for is logged and treated like a missing ROCK (`src/RockServices.cpp`).
 
 ## Public API

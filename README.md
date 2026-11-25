@@ -15,7 +15,7 @@ RobCo P.A.L.M. is a customisable wheel menu for Fallout 4 VR, with quick access 
 
 ## Requirements
 
-Fallout 4 VR, F4SEVR, and RPS UI Framework.
+Fallout 4 VR, F4SEVR, RPS UI Framework, and Mods Config FO4 VR for PALM's settings page.
 
 ROCK 1.0.4 or newer adds physical item handling; hand gestures also need FRIK 0.79.1 or newer with FRIK API 2.3.
 
@@ -29,7 +29,7 @@ Choose your items in **Config → Wheel items**. Select either preset or **Mode 
 
 In **Click to select**, release the opening buttons before selecting with the pointing hand's trigger or A/X. The wheel stays open until you click **Cancel** or enter Config. Opening bindings support press, tap, double tap, hold, long press, and release, with an optional modifier on either hand. Touch and axis inputs are excluded; thumbstick click is supported. Tap and release bindings use click-to-select.
 
-PALM saves its controls and pointer calibration to `Documents\My Games\Fallout4VR\Mods_Config\RobCo_PALM\PALM.toml`; manual edits are read at startup. Each option has its help above it, and `[Developer] Enabled` adds the Developer section to the wheel after a restart.
+PALM's controls, pointer aim, log level and Developer switch are on RobCo PALM's page in Mods Config FO4 VR, and apply when you save there. They are kept in `Documents\My Games\Fallout4VR\Mods_Config\RobCo_PALM\PALM.toml`; manual edits are read at startup. Each option has its help above it, and `[Developer] Enabled` adds the Developer section to the wheel after a restart.
 
 New configurations use `[Controls] InputMode = 1`. Presets do not use `Mode` or `OpenMenu` as their binding; those keys store Custom's settings. `OpenMenu` is a binding table in F4VR-CommonFramework's form, such as `{ hand = "right", type = "release", button = "thumbstick" }`; a one-line binding an earlier PALM wrote becomes that table at the first start. The first start after an update carries your `PALM.ini` settings into `PALM.toml` and deletes the INI; an INI from before input modes keeps its binding through the matching preset or Custom.
 

@@ -1,0 +1,238 @@
+{
+  "minSchemaVersion": 1,
+  "modName": "RobCoPALM",
+  "displayName": "RobCo PALM",
+  "help": "The wheel menu: quick access to your equipment, consumables, hand gestures and mod settings.",
+  "category": "Interface",
+  "specVersion": 1,
+  "f4sePluginRequirements": ["RobCoPALM"],
+  "files": {
+    "palm": { "format": "toml", "root": "myGames", "path": "Mods_Config/RobCo_PALM/PALM.toml" }
+  },
+  "defaultFile": "palm",
+  "applies": "save",
+  "content": [
+    {
+      "type": "text",
+      "text": "<font color='#AAAAAA' size=13>Version: {clientState:modVersion}</font>",
+      "html": true
+    },
+    {
+      "type": "section",
+      "text": "About",
+      "content": [
+        {
+          "type": "text",
+          "text": "RobCo P.A.L.M., the Personal Access & Loadout Manager, is a wheel menu for Fallout 4 VR: up to eight items per category, hand gestures with ROCK and FRIK, and sections other mods add."
+        }
+      ]
+    },
+    { "type": "spacer" },
+    {
+      "type": "section",
+      "text": "Help",
+      "content": [
+        {
+          "type": "button",
+          "text": "RobCo PALM on GitHub",
+          "help": "Opens PALM's page in your browser. Take off the headset to read it on your monitor.",
+          "buttonText": "Open",
+          "action": { "type": "OpenURL", "url": "https://github.com/brunocatani/RobCo_PALM" }
+        },
+        { "type": "spacer" },
+        {
+          "type": "text",
+          "text": "<font color='#10FA78'>Opening the wheel:</font> click and release the right thumbstick, then point and click the pointing hand's trigger or A/X to select. Click Cancel to close. Other ways to open it are on the Controls page.",
+          "html": true
+        },
+        {
+          "type": "text",
+          "text": "<font color='#10FA78'>Choosing items:</font> select Config on the wheel, then Wheel items. Wheel settings chooses which sections the ring shows.",
+          "html": true
+        },
+        {
+          "type": "text",
+          "text": "<font color='#10FA78'>Adding what you hold:</font> hold a weapon, or a loose aid or food item, and select an empty slot on its page to add it to the wheel. Aid and food need ROCK.",
+          "html": true
+        }
+      ]
+    },
+    { "type": "spacer" },
+    {
+      "type": "section",
+      "text": "Developer",
+      "isCollapsible": true,
+      "collapsed": true,
+      "content": [
+        {
+          "type": "stepper",
+          "valueType": "int",
+          "text": "Log Level",
+          "help": "How much PALM writes to RobCoPALM.log.",
+          "default": 2,
+          "valueOptions": {
+            "options": [
+              { "value": 2, "text": "Info", "help": "The basic log, for normal play." },
+              { "value": 3, "text": "Warnings", "help": "Only warnings and errors." },
+              { "value": 4, "text": "Errors", "help": "Only errors." },
+              { "value": 6, "text": "Off", "help": "No log." }
+            ]
+          },
+          "storage": { "path": ["Logging", "LogLevel"] }
+        },
+        {
+          "type": "switcher",
+          "valueType": "bool",
+          "text": "Developer section",
+          "help": "Adds the Developer section to the wheel.",
+          "default": false,
+          "applies": "restart",
+          "storage": { "path": ["Developer", "Enabled"] }
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "id": "controls",
+      "pageDisplayName": "Controls",
+      "help": "How the wheel opens and how you select on it.",
+      "content": [
+        {
+          "id": "inputMode",
+          "type": "dropdown",
+          "valueType": "int",
+          "text": "Input mode",
+          "help": "How the wheel opens and how you select on it.",
+          "default": 1,
+          "valueOptions": {
+            "options": [
+              {
+                "value": 1,
+                "text": "Right stick click",
+                "help": "Click and release the right thumbstick to open, then point and click the pointing hand's trigger or A/X to select. When ROCK's setup wizard moves PALM's binding, ROCK's Palm binding opens it."
+              },
+              {
+                "value": 2,
+                "text": "Hold grip and trigger",
+                "help": "Hold the right trigger and grip for half a second to open, then point and release to select. Release on Cancel to close."
+              },
+              {
+                "value": 3,
+                "text": "Custom",
+                "help": "Your own binding and way of selecting, set below. It is kept when you switch back to another mode."
+              }
+            ]
+          },
+          "storage": { "path": ["Controls", "InputMode"] }
+        },
+        {
+          "type": "section",
+          "text": "Custom",
+          "help": "Used while Input mode is Custom.",
+          "enabledWhen": { "setting": "inputMode", "equals": 3 },
+          "content": [
+            {
+              "type": "cf.inputBinding",
+              "valueType": "string",
+              "text": "Open the wheel",
+              "help": "The button that opens the wheel, with an optional button held with it. Touch and stick pushes are not used.",
+              "default": { "hand": "right", "type": "release", "button": "thumbstick" },
+              "valueOptions": {
+                "hands": ["primary", "offhand", "right", "left"],
+                "types": ["press", "tap", "double", "hold", "longpress", "release"],
+                "buttons": ["trigger", "grip", "a", "b", "thumbstick"]
+              },
+              "storage": { "path": ["Controls", "OpenMenu"] }
+            },
+            {
+              "type": "dropdown",
+              "valueType": "string",
+              "text": "Select by",
+              "help": "How you select once the wheel is open.",
+              "default": "press",
+              "valueOptions": {
+                "options": [
+                  {
+                    "value": "press",
+                    "text": "Click",
+                    "help": "Let go of the opening buttons, then click the pointing hand's trigger or A/X. The wheel stays open until you click Cancel."
+                  },
+                  {
+                    "value": "hold",
+                    "text": "Release",
+                    "help": "Point while you hold the opening buttons, and let go to select. A tap or release binding always selects by click."
+                  }
+                ]
+              },
+              "storage": { "path": ["Controls", "Mode"] }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pointerAim",
+      "pageDisplayName": "Pointer aim",
+      "help": "Where each controller points on the wheel.",
+      "content": [
+        {
+          "type": "text",
+          "text": "0° points straight forward. A negative pitch lowers the pointer, and a positive yaw moves it right."
+        },
+        {
+          "type": "section",
+          "text": "Left hand",
+          "content": [
+            {
+              "type": "slider",
+              "valueType": "float",
+              "text": "Pitch",
+              "help": "Tilts the left hand's pointer up or down.",
+              "default": 0.0,
+              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+              "display": { "decimals": 1, "unit": "°" },
+              "storage": { "path": ["Pointer", "LeftPitchDegrees"] }
+            },
+            {
+              "type": "slider",
+              "valueType": "float",
+              "text": "Yaw",
+              "help": "Turns the left hand's pointer left or right.",
+              "default": 0.0,
+              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+              "display": { "decimals": 1, "unit": "°" },
+              "storage": { "path": ["Pointer", "LeftYawDegrees"] }
+            }
+          ]
+        },
+        {
+          "type": "section",
+          "text": "Right hand",
+          "content": [
+            {
+              "type": "slider",
+              "valueType": "float",
+              "text": "Pitch",
+              "help": "Tilts the right hand's pointer up or down.",
+              "default": 0.0,
+              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+              "display": { "decimals": 1, "unit": "°" },
+              "storage": { "path": ["Pointer", "RightPitchDegrees"] }
+            },
+            {
+              "type": "slider",
+              "valueType": "float",
+              "text": "Yaw",
+              "help": "Turns the right hand's pointer left or right.",
+              "default": 0.0,
+              "valueOptions": { "min": -90, "max": 90, "step": 0.5 },
+              "display": { "decimals": 1, "unit": "°" },
+              "storage": { "path": ["Pointer", "RightYawDegrees"] }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

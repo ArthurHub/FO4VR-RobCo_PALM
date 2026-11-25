@@ -34,11 +34,11 @@ std::vector<settings::Definition> palmDefinitions() {
  const auto player=settings::Group::Player;const PointerAim aim;
  std::vector<settings::Definition> result{
   {"Controls","InputMode","01. Controls","How PALM opens: 1 = click the right thumbstick (or ROCK's Palm binding when ROCK's setup wizard moves it), 2 = hold grip and trigger, 3 = Custom (Mode and OpenMenu).\n"
-   "Change it in game under Config > PALM > Controls.",player,settings::ValueType::Integer,"1"},
+   "Change it in game on RobCo PALM's Controls page in Mods Config FO4 VR.",player,settings::ValueType::Integer,"1"},
   {"Controls","Mode","01. Controls","Custom only: press (click to select) or hold (release to select).",player,settings::ValueType::String,std::string(kDefaultMode)},
   {"Controls","OpenMenu","01. Controls","Custom only: the button that opens PALM, as a table of hand, type and button, for example\n"
    "{ hand = \"right\", type = \"release\", button = \"thumbstick\" }, with an optional duration and modifier = { button = \"grip\" }.\n"
-   "Set it in game under Config > PALM > Controls.",player,settings::ValueType::Table,bindingText(Controls{})},
+   "Set it in game on RobCo PALM's Controls page in Mods Config FO4 VR.",player,settings::ValueType::Table,bindingText(Controls{})},
  };
  for(unsigned hand=0;hand<2;++hand) {
   const auto side=hand?"right":"left";
@@ -46,6 +46,8 @@ std::vector<settings::Definition> palmDefinitions() {
   result.push_back({"Pointer",yawKeys[hand],"02. Pointer Aim",std::format("Turns the {} hand's pointer left or right, in degrees. Range: -90 to 90.",side),player,settings::ValueType::Float,angleText(aim.yaw[hand])});
  }
  result.push_back({"Developer","Enabled","03. Developer","Adds the Developer section to the wheel. Restart the game after changing it.",player,settings::ValueType::Boolean,"false"});
+ result.push_back({"Logging","LogLevel","04. Logging","How much PALM writes to RobCoPALM.log: 2 = Info, 3 = Warnings, 4 = Errors, 6 = Off.\n"
+  "Numbered as in ROCK and FRIK; 0 = Trace and 1 = Debug write the same as Info. Applies when Mods Config saves.",player,settings::ValueType::Integer,"2"});
  return result;
 }
 // The keys of PALM.ini, with the defaults it was written with.
@@ -148,7 +150,7 @@ std::unique_ptr<settings::Store> openPalmSettings(const std::filesystem::path& p
  }
  auto store=std::make_unique<settings::Store>(settings::Files{directory,"RobCo PALM",path.filename().string(),{},
    "## PALM.toml - RobCo PALM controls and pointer aim\n"
-   "## Change these in game under Config > PALM, or edit this file while the game is closed.\n"
+   "## Change these in game on RobCo PALM's page in Mods Config FO4 VR, or edit this file while the game is closed.\n"
    "## Each option has its help above it. When PALM starts it adds new options with their defaults and rewrites its\n"
    "## help lines (##). Your own notes are kept when they start with a single # on the lines above an option.\n",{}},
   palmDefinitions(),settings::LegacyIni{{ini},palmLegacyKeys()},std::span<const settings::RenamedKey>{},std::span<const settings::ValueConversion>(kConversions));
@@ -162,11 +164,12 @@ std::unique_ptr<settings::Store> openPalmSettings(const std::filesystem::path& p
  }
  return store;
 }
-void initializeControls(const std::filesystem::path& path) {
- auto& s=state();std::scoped_lock lock(s.mutex);s.store.reset();s.controls={};s.inputMode=InputMode::StickClick;s.aim={};s.dirty=false;s.save=false;s.status.clear();s.aimDirty=false;s.aimChanged=true;
- if(path.empty())return;
- try{s.store=openPalmSettings(path);}
- catch(const std::exception& error){s.status=std::format("Could not open {}: {}",path.filename().string(),error.what());return;}
+namespace {
+/**
+ * Applies the values the store read: the controls, the input mode and the pointer aim. A value that does not read
+ * keeps the one PALM has, and says so in the status; the runtime takes the aim at its next frame.
+ */
+void readStoreValues(State& s) {
  const auto& store=*s.store;
  if(!store.messages().empty())s.status=store.messages().front();
  Controls value;
@@ -183,7 +186,40 @@ void initializeControls(const std::filesystem::path& path) {
   valid=readAngle(store,yawKeys[hand],s.aim.yaw[hand]) && valid;
  }
  if(!valid)s.status="Invalid pointer angle; using its default";
+ s.aimChanged=true;
 }
+}
+void initializeControls(const std::filesystem::path& path) {
+ auto& s=state();std::scoped_lock lock(s.mutex);s.store.reset();s.controls={};s.inputMode=InputMode::StickClick;s.aim={};s.dirty=false;s.save=false;s.status.clear();s.aimDirty=false;s.aimChanged=true;
+ if(path.empty())return;
+ try{s.store=openPalmSettings(path);}
+ catch(const std::exception& error){s.status=std::format("Could not open {}: {}",path.filename().string(),error.what());return;}
+ readStoreValues(s);
+}
+/**
+ * Reads PALM.toml again after another editor saved it, as Mods Config FO4 VR does, and returns the problems the read
+ * found, each naming its line. Nothing happens before initializeControls opened the file.
+ */
+std::vector<std::string> reloadControls() {
+ auto& s=state();std::scoped_lock lock(s.mutex);
+ if(!s.store)return {};
+ s.store->load(false);
+ readStoreValues(s);
+ return s.store->messages();
+}
+/**
+ * [Logging] LogLevel as spdlog's level number: 0 = trace to 6 = off, as ROCK and FRIK number it. A value outside that
+ * range, or one that does not read, is 2 (info).
+ */
+int logLevel(const settings::Store& store) {
+ const auto& text=store.find("Logging","LogLevel")->value;int level{};
+ const auto result=std::from_chars(text.data(),text.data()+text.size(),level);
+ return result.ec==std::errc{} && result.ptr==text.data()+text.size() && level>=0 && level<=6?level:2;
+}
+/**
+ * The log level PALM.toml held at its last read; 2 (info) before initializeControls opened it.
+ */
+int snapshotLogLevel(){auto& s=state();std::scoped_lock lock(s.mutex);return s.store?logLevel(*s.store):2;}
 bool applyControls(const Controls& controls,bool queueSave) {
  Controls validated;std::string error;
  if(!parseControls(controls.mode==OpenMode::Hold?"hold":"press",bindingText(controls),validated,error)){auto& s=state();std::scoped_lock lock(s.mutex);s.status=error;return false;}

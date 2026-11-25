@@ -62,13 +62,16 @@ target_compile_definitions(palm_preview INTERFACE WHEEL_DESKTOP_PREVIEW)
 target_link_libraries(palm_preview INTERFACE wheel_view)
 configure_file(cmake/version.rc.in version.rc @ONLY)
 add_library(RobCoPALM SHARED src/Plugin.cpp src/Runtime.cpp src/RockServices.cpp src/Gestures.cpp src/Inventory.cpp src/Equipment.cpp src/Renderer.cpp src/MenuApi.cpp src/RequiredUpdates.cpp
- src/SettingsMenu.cpp src/exports.def src/IconResources.rc "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
+ src/SettingsMenu.cpp src/ModsConfigClient.cpp src/exports.def src/IconResources.rc "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
 set_target_properties(RobCoPALM PROPERTIES OUTPUT_NAME wheelmenu)
 set_source_files_properties(src/Gestures.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties(src/MenuApi.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 target_include_directories(RobCoPALM PRIVATE src
  "${ROCK_INCLUDE_DIR}"
- "${RPSUI_INCLUDE_DIR}")
+ "${RPSUI_INCLUDE_DIR}"
+ # Mods Config FO4 VR's client header, copied as is.
+ external/ModsConfigFO4)
+target_compile_definitions(RobCoPALM PRIVATE PALM_VERSION="${PROJECT_VERSION}")
 target_link_libraries(RobCoPALM PRIVATE CommonLibF4::CommonLibF4 spdlog::spdlog wheel_view shell32 version bcrypt)
 target_precompile_headers(RobCoPALM PRIVATE src/PCH.h)
 target_compile_options(RobCoPALM PRIVATE /MP /Zi /wd4715 /utf-8)
@@ -82,7 +85,9 @@ if(NOT COPY_PLUGIN_BASE_PATH STREQUAL "")
  add_custom_command(TARGET RobCoPALM POST_BUILD
  COMMAND ${CMAKE_COMMAND} -E make_directory "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins"
  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:RobCoPALM>" "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins/"
- COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_PDB_FILE:RobCoPALM>" "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins/")
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_PDB_FILE:RobCoPALM>" "${COPY_PLUGIN_BASE_PATH}/F4SE/Plugins/"
+ # PALM's page in Mods Config FO4 VR.
+ COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CMAKE_CURRENT_SOURCE_DIR}/data" "${COPY_PLUGIN_BASE_PATH}")
 endif()
 enable_testing()
 add_executable(PALMDeveloperActionsTests tests/DeveloperActionsTests.cpp src/DeveloperActions.cpp src/SectionRegistry.cpp)

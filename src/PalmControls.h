@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 #include <RPS/Settings/Store.h>
 
 namespace wheel {
@@ -132,6 +133,9 @@ std::unique_ptr<RPS::Settings::Store> openPalmSettings(const std::filesystem::pa
 // Loads controls and pointer aim from PALM.toml at path; an empty path keeps
 // them in memory only (the desktop preview).
 void initializeControls(const std::filesystem::path& path);
+std::vector<std::string> reloadControls();
+int logLevel(const RPS::Settings::Store& store);
+int snapshotLogLevel();
 bool applyControls(const Controls& controls,bool queueSave=true); // Memory only; explicit save is queued for the game task.
 bool takeControlsSaveRequest();
 void persistControls();

@@ -1,0 +1,6 @@
+Mods Config FO4 VR native API client header, by ArthurHub.
+https://github.com/ArthurHub/F4VR-Mods-Config
+Commit: 9710de010c2a0373869b6361b356bda79fd83e54 (src/api/ModsConfigFO4Api.h)
+GPL-3.0; see LICENSE.
+Copied as is, as Mods Config asks of every client: refresh it from Mods Config's src/api/ when its API grows,
+never edit it.

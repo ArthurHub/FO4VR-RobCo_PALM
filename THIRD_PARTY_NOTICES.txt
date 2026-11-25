@@ -305,3 +305,14 @@ Authors: ArthurHub and contributors; GNU GPL version 3.
 external/F4VR-Input contains the upstream binding parser and extracted value
 types. Include paths are adapted to this build. ORIGIN.txt records provenance;
 external/F4VR-Input/LICENSE contains the upstream license text.
+
+========================================================================
+Mods Config FO4 VR native API
+========================================================================
+
+Upstream: https://github.com/ArthurHub/F4VR-Mods-Config
+Pinned source: 9710de010c2a0373869b6361b356bda79fd83e54
+Authors: ArthurHub and contributors; GNU GPL version 3.
+external/ModsConfigFO4/ModsConfigFO4Api.h is an unmodified copy of the client
+header Mods Config FO4 VR asks each client to copy. ORIGIN.txt records
+provenance; external/ModsConfigFO4/LICENSE contains the upstream license text.

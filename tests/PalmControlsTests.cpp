@@ -333,6 +333,21 @@ int main(){try {
  initializeControls(path);check(snapshotControls().binding.hand==Hand::Left,"the converted binding did not read back");
  write(path,"[Controls]\nInputMode = 3\nOpenMenu = \"sideways\"\n");initializeControls(path);
  check(snapshotControls()==Controls{},"an unreadable old OpenMenu line did not become the default");
+ // Another editor's Save, as Mods Config's, is read again while PALM runs.
+ (void)takePointerAimChange();
+ check(snapshotLogLevel()==2,"the default log level is not info");
+ write(path,"[Controls]\nInputMode = 3\nMode = \"hold\"\nOpenMenu = { hand = \"left\", type = \"hold\", button = \"grip\", duration = 0.5 }\n[Pointer]\nLeftPitchDegrees = -12.5\nRightYawDegrees = 4.0\n[Logging]\nLogLevel = 4\n");
+ check(reloadControls().empty(),"a valid PALM.toml reported problems on reload");
+ check(snapshotLogLevel()==4,"a reload did not read the log level");
+ {
+  InputMode reloadedMode{};const auto reloaded=snapshotControls(&reloadedMode);
+  check(reloadedMode==InputMode::Custom && reloaded.mode==OpenMode::Hold && reloaded.binding.hand==Hand::Left && reloaded.binding.type==ActivationType::HoldDown,"a reload did not apply the saved controls");
+  const auto sameAngle=[](float a,float b){return std::fabs(a-b)<1e-4f;};
+  check(sameAngle(snapshotPointerAim().pitch[0],-12.5f) && sameAngle(snapshotPointerAim().yaw[1],4.f) && takePointerAimChange(),"a reload did not apply the saved pointer aim");
+ }
+ write(path,"[Controls]\nInputMode = 3\nOpenMenu = { hand = \"sideways\" }\n[Logging]\nLogLevel = 9\n");(void)reloadControls();
+ check(snapshotControls().binding.hand==Hand::Left,"an unreadable binding replaced the controls on reload");
+ check(snapshotLogLevel()==2,"an out-of-range log level was not info");
  // An INI with a chosen preset keeps it.
  std::filesystem::remove(path);write(ini,"[Controls]\niInputMode=2\nsMode=press\nsOpenMenu=right release thumbstick suppress\n");
  initializeControls(path);check(snapshotInputMode()==InputMode::GripTriggerHold,"a migrated preset was not kept");
